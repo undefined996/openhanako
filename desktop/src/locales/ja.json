@@ -2223,5 +2223,6 @@
   "preview.markdownPreview": "プレビュー",
   "preview.exitMarkdownPreview": "編集に戻る",
   "preview.openInNewWindow": "新しいウィンドウで表示",
-  "preview.openInNewWindowUnsupported": "このファイル形式は対応していません"
+  "preview.openInNewWindowUnsupported": "このファイル形式は対応していません",
+  "preview.markdownEditorStatus": "選択 {selected} 文字 · 合計 {total} 文字"
 }

@@ -2223,5 +2223,6 @@
   "preview.markdownPreview": "미리보기",
   "preview.exitMarkdownPreview": "편집으로 돌아가기",
   "preview.openInNewWindow": "새 창에서 보기",
-  "preview.openInNewWindowUnsupported": "이 파일 형식은 지원되지 않습니다"
+  "preview.openInNewWindowUnsupported": "이 파일 형식은 지원되지 않습니다",
+  "preview.markdownEditorStatus": "선택 {selected}자 · 총 {total}자"
 }
