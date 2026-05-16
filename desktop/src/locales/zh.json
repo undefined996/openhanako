@@ -858,10 +858,10 @@
     },
     "security": {
       "sandbox": "沙盒",
-      "sandboxDesc": "限制 AI 的文件系统访问范围，仅允许操作工作目录和必要的数据文件夹",
-      "sandboxWarning": "关闭沙盒后 AI 可以访问系统上的任意文件，可能产生意想不到的结果",
+      "sandboxDesc": "限制 AI 的文件系统写入范围；普通外部文件可只读访问，工作目录内可读写",
+      "sandboxWarning": "关闭沙盒后 AI 可以读写或删除系统上的任意文件，可能产生意想不到的结果",
       "sandboxNetwork": "允许沙盒联网",
-      "sandboxNetworkDesc": "开启后，沙盒内的命令可以访问公网；文件系统限制仍然生效",
+      "sandboxNetworkDesc": "开启后，沙盒内的命令可以访问公网；文件写入限制仍然生效",
       "sandboxNetworkDisabledDesc": "沙盒关闭时命令已按普通进程联网，这个开关只影响开启沙盒后的命令",
       "networkProxy": "出站代理",
       "networkProxyMode": "代理模式",

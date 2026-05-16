@@ -848,10 +848,10 @@
     },
     "security": {
       "sandbox": "沙盒",
-      "sandboxDesc": "限制 AI 的檔案系統存取範圍，僅允許操作工作目錄和必要的資料夾",
-      "sandboxWarning": "關閉沙盒後 AI 可以存取系統上的任意檔案，可能產生意想不到的結果",
+      "sandboxDesc": "限制 AI 的檔案系統寫入範圍；普通外部檔案可唯讀存取，工作目錄內可讀寫",
+      "sandboxWarning": "關閉沙盒後 AI 可以讀寫或刪除系統上的任意檔案，可能產生意想不到的結果",
       "sandboxNetwork": "允許沙盒聯網",
-      "sandboxNetworkDesc": "開啟後，沙盒內的命令可以存取公網；檔案系統限制仍然生效",
+      "sandboxNetworkDesc": "開啟後，沙盒內的命令可以存取公網；檔案寫入限制仍然生效",
       "sandboxNetworkDisabledDesc": "沙盒關閉時命令已按普通行程聯網，這個開關只影響開啟沙盒後的命令",
       "networkProxy": "出站代理",
       "networkProxyMode": "代理模式",

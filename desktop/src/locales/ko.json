@@ -848,10 +848,10 @@
     },
     "security": {
       "sandbox": "샌드박스",
-      "sandboxDesc": "AI의 파일 시스템 접근을 작업 디렉토리와 필수 데이터 폴더로 제한합니다",
-      "sandboxWarning": "샌드박스를 비활성화하면 AI가 시스템의 모든 파일에 접근할 수 있어 예상치 못한 결과가 발생할 수 있습니다",
+      "sandboxDesc": "파일 시스템 쓰기를 제한해요. 일반 외부 파일은 읽기 전용이고, 작업 디렉토리 안에서는 읽고 쓸 수 있어요",
+      "sandboxWarning": "샌드박스를 비활성화하면 AI가 시스템의 모든 파일을 읽고 쓰거나 삭제할 수 있어 예상치 못한 결과가 발생할 수 있습니다",
       "sandboxNetwork": "샌드박스 네트워크 허용",
-      "sandboxNetworkDesc": "켜면 파일 시스템 제한은 유지하면서 샌드박스 안의 명령이 공개 인터넷에 접속할 수 있어요",
+      "sandboxNetworkDesc": "켜면 파일 쓰기 제한은 유지하면서 샌드박스 안의 명령이 공개 인터넷에 접속할 수 있어요",
       "sandboxNetworkDisabledDesc": "샌드박스가 꺼져 있으면 명령은 일반 로컬 프로세스로 실행돼요. 이 설정은 샌드박스 안의 명령에만 적용돼요",
       "networkProxy": "아웃바운드 프록시",
       "networkProxyMode": "프록시 모드",
