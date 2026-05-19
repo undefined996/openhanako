@@ -81,9 +81,9 @@ export class PreferencesManager {
     this.savePreferences(prefs);
   }
 
-  /** 读取沙盒内命令是否允许出站联网。默认关闭。 */
+  /** 读取沙盒内命令是否允许出站联网。默认开启，避免沙盒破坏常规工具链。 */
   getSandboxNetwork() {
-    return this._cache.sandbox_network === true;
+    return this._cache.sandbox_network !== false;
   }
 
   /** 保存沙盒内命令出站联网偏好。 */
