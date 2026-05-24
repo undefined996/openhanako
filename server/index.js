@@ -888,6 +888,8 @@ try {
       networkMode: serverRuntimeState.mode,
       token: SERVER_TOKEN,
       version: appVersion,
+      ownerKind: process.env.HANA_SERVER_OWNER === "desktop" ? "desktop" : "standalone",
+      ownerPid: Number.parseInt(process.env.HANA_SERVER_OWNER_PID || "", 10) || null,
       serverId: runtimeContext.serverId || null,
       serverNodeId: runtimeContext.serverNodeId || runtimeContext.serverId || null,
       studioId: runtimeContext.studioId || null,

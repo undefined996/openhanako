@@ -328,7 +328,8 @@ let serverPort = null;
 let serverToken = null;
 let isQuitting = false;  // 区分关窗口（hide）和真正退出（quit）
 let tray = null;
-let reusedServerPid = null; // 复用已有 server 时记录其 PID，退出时发 SIGTERM
+let reusedServerPid = null; // 复用已有 server 时记录其 PID，用 owner 字段决定是否关闭
+let reusedServerOwned = false; // 仅 desktop-owned 的复用 server 才由 desktop 退出时关闭
 let isExitingServer = false; // 只有托盘"退出"时才 kill server，其余路径仅关前端
 let _isUpdating = false;  // auto-updater 正在执行 quitAndInstall，before-quit 跳过 server 清理
 let _autoUpdaterInitialized = false;
@@ -717,6 +718,10 @@ async function verifyReusableServerInfo(existingInfo) {
   return { reusable: true, trusted: true, terminate: false, reason: "ok", health, identity };
 }
 
+function isDesktopOwnedServerInfo(info) {
+  return info?.ownerKind === "desktop";
+}
+
 async function startServer() {
   const serverInfoPath = path.join(hanakoHome, "server-info.json");
 
@@ -738,6 +743,7 @@ async function startServer() {
         serverPort = existingInfo.port;
         serverToken = existingInfo.token;
         reusedServerPid = existingInfo.pid;
+        reusedServerOwned = isDesktopOwnedServerInfo(existingInfo);
         return; // 跳过启动
       }
 
@@ -825,8 +831,15 @@ async function startServer() {
 async function _spawnServerOnce(serverInfoPath) {
   _serverLogs = [];
   _lastServerProgressAtMs = null;
+  reusedServerPid = null;
+  reusedServerOwned = false;
 
-  let serverEnv = { ...withHanaPiSdkEnv(process.env, hanakoHome), HANA_HOME: hanakoHome };
+  let serverEnv = {
+    ...withHanaPiSdkEnv(process.env, hanakoHome),
+    HANA_HOME: hanakoHome,
+    HANA_SERVER_OWNER: "desktop",
+    HANA_SERVER_OWNER_PID: String(process.pid),
+  };
   serverEnv = await serverEnvironmentForNetworkProxy(serverEnv);
 
   // Windows: 注入 PortableGit 路径，并从注册表补齐当前系统 / 用户 PATH。
@@ -3628,8 +3641,16 @@ async function shutdownServer() {
 
     if (serverProcess === proc) serverProcess = null;
   } else if (reusedServerPid) {
-    console.log("[desktop] shutdownServer: 正在关闭 reused server...");
     const pid = reusedServerPid;
+    if (!reusedServerOwned) {
+      console.log("[desktop] shutdownServer: detached from external server");
+      reusedServerPid = null;
+      reusedServerOwned = false;
+      removeServerInfo = false;
+      return;
+    }
+
+    console.log("[desktop] shutdownServer: 正在关闭 reused server...");
     try {
       await fetch(`http://127.0.0.1:${serverPort}/api/shutdown`, {
         method: "POST",
@@ -3649,7 +3670,10 @@ async function shutdownServer() {
         removeServerInfo = false;
       }
     }
-    if (reusedServerPid === pid) reusedServerPid = null;
+    if (reusedServerPid === pid) {
+      reusedServerPid = null;
+      reusedServerOwned = false;
+    }
   }
   // 清理 server-info.json，防止更新后新版 Electron 误连旧 server
   if (removeServerInfo) {
@@ -3681,7 +3705,7 @@ app.on("before-quit", async (event) => {
   _currentBrowserSession = null;
 
   // server 清理
-  if ((serverProcess && !hasChildExitObserved(serverProcess)) || reusedServerPid) {
+  if ((serverProcess && !hasChildExitObserved(serverProcess)) || (reusedServerPid && reusedServerOwned)) {
     event.preventDefault();
     await shutdownServer();
     app.quit();
