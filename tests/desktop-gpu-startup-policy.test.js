@@ -8,8 +8,10 @@ const require = createRequire(import.meta.url);
 
 const {
   applyGpuStartupPolicy,
+  buildGpuStartupDiagnostics,
   markGpuStartupFailed,
   markGpuStartupPending,
+  markGpuStartupPhase,
   markGpuStartupReady,
   recordGpuChildProcessGone,
   resolveGpuStartupPolicy,
@@ -161,6 +163,7 @@ describe("desktop GPU startup policy", () => {
     const statePath = path.join(hanakoHome, "user", "gpu-startup.json");
     const state = readJson(statePath);
     state.startup.phase = "server-starting";
+    delete state.startup.gpuRecovery;
     writeGpuState(hanakoHome, state);
 
     const policy = resolveGpuStartupPolicy({
@@ -177,12 +180,170 @@ describe("desktop GPU startup policy", () => {
     expect(readJson(statePath).autoGpuMode).toBeUndefined();
   });
 
-  it("still applies an existing auto GPU mode when a server marker is stale", () => {
+  it("clears pre-UI GPU recovery eligibility when startup reaches server without visible UI", () => {
+    const hanakoHome = makeHome();
+    markGpuStartupPending({
+      hanakoHome,
+      platform: "win32",
+      phase: "electron-starting",
+      startupId: "previous-launch",
+      now: "2026-05-19T01:00:00.000Z",
+    });
+    markGpuStartupPhase({
+      hanakoHome,
+      platform: "win32",
+      phase: "server-starting",
+      startupId: "previous-launch",
+      now: "2026-05-19T01:00:01.000Z",
+    });
+
+    const policy = resolveGpuStartupPolicy({
+      hanakoHome,
+      platform: "win32",
+      argv: ["Hanako.exe"],
+      env: {},
+      now: "2026-05-19T01:01:00.000Z",
+    });
+
+    const state = readJson(path.join(hanakoHome, "user", "gpu-startup.json"));
+    expect(policy.mode).toBe("hardware");
+    expect(policy.reason).toBe("default");
+    expect(state.startup.gpuRecovery).toMatchObject({
+      eligible: false,
+      phase: null,
+    });
+    expect(state.autoGpuMode).toBeUndefined();
+  });
+
+  it("preserves GPU recovery eligibility when server startup follows a visible splash", () => {
+    const hanakoHome = makeHome();
+    markGpuStartupPending({
+      hanakoHome,
+      platform: "win32",
+      phase: "electron-starting",
+      startupId: "previous-launch",
+      now: "2026-05-19T01:00:00.000Z",
+    });
+    markGpuStartupPhase({
+      hanakoHome,
+      platform: "win32",
+      phase: "launching-splash",
+      startupId: "previous-launch",
+      now: "2026-05-19T01:00:01.000Z",
+    });
+    markGpuStartupPhase({
+      hanakoHome,
+      platform: "win32",
+      phase: "splash-ready",
+      startupId: "previous-launch",
+      now: "2026-05-19T01:00:02.000Z",
+    });
+    markGpuStartupPhase({
+      hanakoHome,
+      platform: "win32",
+      phase: "server-starting",
+      startupId: "previous-launch",
+      now: "2026-05-19T01:00:03.000Z",
+    });
+    markGpuStartupPhase({
+      hanakoHome,
+      platform: "win32",
+      phase: "server-ready",
+      startupId: "previous-launch",
+      now: "2026-05-19T01:00:04.000Z",
+    });
+
+    const policy = resolveGpuStartupPolicy({
+      hanakoHome,
+      platform: "win32",
+      argv: ["Hanako.exe"],
+      env: {},
+      now: "2026-05-19T01:01:00.000Z",
+    });
+
+    const state = readJson(path.join(hanakoHome, "user", "gpu-startup.json"));
+    expect(policy.mode).toBe("gpu-sandbox-compat");
+    expect(policy.reason).toBe("previous-startup-incomplete");
+    expect(state.autoGpuMode).toMatchObject({
+      mode: "gpu-sandbox-compat",
+      reason: "previous-startup-incomplete",
+      previousStartup: expect.objectContaining({
+        phase: "server-ready",
+        gpuRecovery: expect.objectContaining({
+          eligible: true,
+          phase: "splash-ready",
+        }),
+      }),
+    });
+  });
+
+  it("re-enables GPU recovery eligibility when hidden startup creates the main window after server boot", () => {
+    const hanakoHome = makeHome();
+    markGpuStartupPending({
+      hanakoHome,
+      platform: "win32",
+      phase: "electron-starting",
+      startupId: "hidden-launch",
+      now: "2026-05-19T01:00:00.000Z",
+    });
+    markGpuStartupPhase({
+      hanakoHome,
+      platform: "win32",
+      phase: "server-starting",
+      startupId: "hidden-launch",
+      now: "2026-05-19T01:00:01.000Z",
+    });
+    markGpuStartupPhase({
+      hanakoHome,
+      platform: "win32",
+      phase: "server-ready",
+      startupId: "hidden-launch",
+      now: "2026-05-19T01:00:02.000Z",
+    });
+    markGpuStartupPhase({
+      hanakoHome,
+      platform: "win32",
+      phase: "main-window-created",
+      startupId: "hidden-launch",
+      now: "2026-05-19T01:00:03.000Z",
+    });
+
+    const policy = resolveGpuStartupPolicy({
+      hanakoHome,
+      platform: "win32",
+      argv: ["Hanako.exe"],
+      env: {},
+      now: "2026-05-19T01:01:00.000Z",
+    });
+
+    const state = readJson(path.join(hanakoHome, "user", "gpu-startup.json"));
+    expect(policy.mode).toBe("gpu-sandbox-compat");
+    expect(policy.reason).toBe("previous-startup-incomplete");
+    expect(state.autoGpuMode).toMatchObject({
+      mode: "gpu-sandbox-compat",
+      reason: "previous-startup-incomplete",
+      previousStartup: expect.objectContaining({
+        phase: "main-window-created",
+        gpuRecovery: expect.objectContaining({
+          eligible: true,
+          phase: "main-window-created",
+        }),
+      }),
+    });
+  });
+
+  it.each([
+    ["gpu-sandbox-compat", true, false],
+    ["gpu-backend-compat", true, true],
+    ["software-safe", false, false],
+    ["deep-compat", false, false],
+    ["diagnostic-failed", false, false],
+  ])("still applies existing auto GPU mode %s when a server marker is stale", (mode, hardwareAccelerationEnabled, backendCompat) => {
     const hanakoHome = makeHome();
     writeGpuState(hanakoHome, {
       version: 2,
       autoGpuMode: {
-        mode: "gpu-sandbox-compat",
+        mode,
         reason: "gpu-child-process-gone",
         previousMode: "hardware",
         updatedAt: "2026-05-19T01:00:00.000Z",
@@ -205,10 +366,12 @@ describe("desktop GPU startup policy", () => {
       now: "2026-05-19T01:01:00.000Z",
     });
 
-    expect(policy.mode).toBe("gpu-sandbox-compat");
+    expect(policy.mode).toBe(mode);
     expect(policy.reason).toBe("gpu-child-process-gone");
+    expect(policy.hardwareAccelerationEnabled).toBe(hardwareAccelerationEnabled);
+    expect(policy.shouldApplyGpuBackendCompatSwitches).toBe(backendCompat);
     expect(readJson(path.join(hanakoHome, "user", "gpu-startup.json")).autoGpuMode).toMatchObject({
-      mode: "gpu-sandbox-compat",
+      mode,
       reason: "gpu-child-process-gone",
     });
   });
@@ -250,6 +413,48 @@ describe("desktop GPU startup policy", () => {
       previousStartup: expect.objectContaining({
         policy: expect.objectContaining({
           mode: "gpu-sandbox-compat",
+        }),
+      }),
+    });
+  });
+
+  it("escalates a stale pending GPU backend compatibility launch into software safe mode", () => {
+    const hanakoHome = makeHome();
+    const backendPolicy = resolveGpuStartupPolicy({
+      hanakoHome,
+      platform: "win32",
+      argv: ["Hanako.exe", "--hana-gpu-backend-compat"],
+      env: {},
+    });
+
+    markGpuStartupPending({
+      hanakoHome,
+      platform: "win32",
+      phase: "electron-starting",
+      startupId: "backend-launch",
+      policy: backendPolicy,
+      now: "2026-05-19T01:00:00.000Z",
+    });
+
+    const policy = resolveGpuStartupPolicy({
+      hanakoHome,
+      platform: "win32",
+      argv: ["Hanako.exe"],
+      env: {},
+      now: "2026-05-19T01:01:00.000Z",
+    });
+
+    expect(policy.mode).toBe("software-safe");
+    expect(policy.hardwareAccelerationEnabled).toBe(false);
+    expect(policy.shouldDisableHardwareAcceleration).toBe(true);
+    expect(policy.reason).toBe("previous-startup-incomplete");
+    expect(readJson(path.join(hanakoHome, "user", "gpu-startup.json")).autoGpuMode).toMatchObject({
+      mode: "software-safe",
+      reason: "previous-startup-incomplete",
+      previousMode: "gpu-backend-compat",
+      previousStartup: expect.objectContaining({
+        policy: expect.objectContaining({
+          mode: "gpu-backend-compat",
         }),
       }),
     });
@@ -382,6 +587,40 @@ describe("desktop GPU startup policy", () => {
     });
   });
 
+  it("escalates a GPU crash from backend compatibility into software safe mode", () => {
+    const hanakoHome = makeHome();
+    const policy = resolveGpuStartupPolicy({
+      hanakoHome,
+      platform: "win32",
+      argv: ["Hanako.exe", "--hana-gpu-backend-compat"],
+      env: {},
+    });
+
+    recordGpuChildProcessGone({
+      hanakoHome,
+      platform: "win32",
+      policy,
+      details: { type: "GPU", reason: "crashed", exitCode: -2147483645 },
+      now: "2026-05-19T01:02:00.000Z",
+    });
+
+    const nextPolicy = resolveGpuStartupPolicy({
+      hanakoHome,
+      platform: "win32",
+      argv: ["Hanako.exe"],
+      env: {},
+    });
+
+    expect(nextPolicy.hardwareAccelerationEnabled).toBe(false);
+    expect(nextPolicy.mode).toBe("software-safe");
+    expect(nextPolicy.shouldDisableHardwareAcceleration).toBe(true);
+    expect(readJson(path.join(hanakoHome, "user", "gpu-startup.json")).autoGpuMode).toMatchObject({
+      mode: "software-safe",
+      reason: "gpu-child-process-gone",
+      previousMode: "gpu-backend-compat",
+    });
+  });
+
   it("escalates a software-safe GPU crash to deep compatibility without changing the user preference", () => {
     const hanakoHome = makeHome();
     writePrefs(hanakoHome, { hardware_acceleration: false });
@@ -508,7 +747,7 @@ describe("desktop GPU startup policy", () => {
     expect(app.commandLine.appendSwitch).not.toHaveBeenCalledWith("no-sandbox", expect.anything());
   });
 
-  it("applies backend compatibility switches before disabling hardware acceleration", () => {
+  it("applies backend compatibility switches without disabling hardware acceleration", () => {
     const app = {
       disableHardwareAcceleration: vi.fn(),
       commandLine: {
@@ -532,6 +771,21 @@ describe("desktop GPU startup policy", () => {
     expect(app.commandLine.appendSwitch).toHaveBeenCalledWith("disable-direct-composition");
     expect(app.commandLine.appendSwitch).not.toHaveBeenCalledWith("no-sandbox");
     expect(app.commandLine.appendSwitch).not.toHaveBeenCalledWith("no-sandbox", expect.anything());
+  });
+
+  it("allows explicit GPU backend compatibility without global no-sandbox", () => {
+    const hanakoHome = makeHome();
+    const policy = resolveGpuStartupPolicy({
+      hanakoHome,
+      platform: "win32",
+      argv: ["Hanako.exe", "--hana-gpu-backend-compat"],
+      env: {},
+    });
+
+    expect(policy.mode).toBe("gpu-backend-compat");
+    expect(policy.hardwareAccelerationEnabled).toBe(true);
+    expect(policy.shouldApplyGpuBackendCompatSwitches).toBe(true);
+    expect(policy.shouldApplyUnsafeNoSandboxSwitch).toBe(false);
   });
 
   it("allows explicit GPU sandbox compatibility without global no-sandbox", () => {
@@ -574,6 +828,39 @@ describe("desktop GPU startup policy", () => {
     expect(app.commandLine.appendSwitch).toHaveBeenCalledWith("no-sandbox");
   });
 
+  it("does not persist explicit unsafe no-sandbox after a GPU crash", () => {
+    const hanakoHome = makeHome();
+    const policy = resolveGpuStartupPolicy({
+      hanakoHome,
+      platform: "win32",
+      argv: ["Hanako.exe", "--hana-gpu-unsafe-no-sandbox"],
+      env: {},
+    });
+
+    recordGpuChildProcessGone({
+      hanakoHome,
+      platform: "win32",
+      policy,
+      details: { type: "GPU", reason: "crashed", exitCode: -2147483645 },
+      now: "2026-05-19T01:02:00.000Z",
+    });
+
+    const nextPolicy = resolveGpuStartupPolicy({
+      hanakoHome,
+      platform: "win32",
+      argv: ["Hanako.exe"],
+      env: {},
+    });
+
+    expect(nextPolicy.mode).toBe("gpu-backend-compat");
+    expect(nextPolicy.shouldApplyUnsafeNoSandboxSwitch).toBe(false);
+    expect(readJson(path.join(hanakoHome, "user", "gpu-startup.json")).autoGpuMode).toMatchObject({
+      mode: "gpu-backend-compat",
+      reason: "gpu-child-process-gone",
+      previousMode: "gpu-sandbox-compat",
+    });
+  });
+
   it("applies deep compatibility switches without disabling software rasterizer or sandbox", () => {
     const app = {
       disableHardwareAcceleration: vi.fn(),
@@ -596,5 +883,36 @@ describe("desktop GPU startup policy", () => {
     expect(app.commandLine.appendSwitch).not.toHaveBeenCalledWith("disable-gpu-sandbox", expect.anything());
     expect(app.commandLine.appendSwitch).not.toHaveBeenCalledWith("no-sandbox");
     expect(app.commandLine.appendSwitch).not.toHaveBeenCalledWith("no-sandbox", expect.anything());
+  });
+
+  it("records backend policy and recovery classification in diagnostics", () => {
+    const hanakoHome = makeHome();
+    const policy = resolveGpuStartupPolicy({
+      hanakoHome,
+      platform: "win32",
+      argv: ["Hanako.exe", "--hana-gpu-backend-compat"],
+      env: {},
+    });
+
+    markGpuStartupPending({
+      hanakoHome,
+      platform: "win32",
+      phase: "launching-splash",
+      startupId: "backend-launch",
+      policy,
+      now: "2026-05-19T01:00:00.000Z",
+    });
+
+    const state = readJson(path.join(hanakoHome, "user", "gpu-startup.json"));
+    expect(state.startup.policy).toMatchObject({
+      mode: "gpu-backend-compat",
+      shouldApplyGpuBackendCompatSwitches: true,
+      shouldApplyUnsafeNoSandboxSwitch: false,
+    });
+
+    const diagnostics = buildGpuStartupDiagnostics({ hanakoHome, policy });
+    expect(diagnostics).toContain("GPU backend compatibility switches enabled: true");
+    expect(diagnostics).toContain("GPU sandbox disabled by policy: true");
+    expect(diagnostics).toContain("Incomplete startup classification: gpu-recovery");
   });
 });
