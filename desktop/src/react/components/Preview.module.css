@@ -411,16 +411,6 @@
     pointer-events: none;
 }
 
-:global(.preview-editor .cm-scroller) {
-    overflow: auto;
-    padding: var(--space-lg) 0;
-}
-
-:global(.preview-editor .cm-content) {
-    width: 100%;
-    padding: 0 var(--space-md);
-}
-
 :global(.preview-editor .cm-gutters) {
     background: transparent;
     border-right: 1px solid var(--overlay-light);

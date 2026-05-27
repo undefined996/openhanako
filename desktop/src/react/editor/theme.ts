@@ -4,8 +4,14 @@ export const codeTheme = EditorView.theme({
   '&': { fontSize: '0.84rem' },
   '&.cm-focused': { outline: 'none' },
   '.cm-scroller': {
+    overflow: 'auto',
     fontFamily: 'var(--font-mono)',
     lineHeight: '1.7',
+    padding: 'var(--space-lg) 0',
+  },
+  '.cm-content': {
+    width: '100%',
+    padding: '0 var(--space-md)',
   },
 });
 
@@ -13,11 +19,18 @@ export const markdownTheme = EditorView.theme({
   '&': { fontSize: 'var(--editor-markdown-font-size)' },
   '&.cm-focused': { outline: 'none' },
   '.cm-scroller': {
+    overflow: 'auto',
     fontFamily: 'var(--font-serif)',
     lineHeight: 'var(--editor-markdown-line-height)',
     padding: 'var(--space-md) 0',
   },
-  '.cm-content': { padding: '0 var(--editor-markdown-content-padding-x)' },
+  '&.cm-markdown-has-top-cover .cm-scroller': {
+    paddingTop: '0',
+  },
+  '.cm-content': {
+    width: '100%',
+    padding: '0 var(--editor-markdown-content-padding-x)',
+  },
   '.cm-activeLine': { backgroundColor: 'transparent' },
   '.cm-activeLineGutter': { backgroundColor: 'transparent' },
   '.cm-cursor': { borderLeftColor: 'var(--text)' },
@@ -50,7 +63,9 @@ export const markdownTheme = EditorView.theme({
     touchAction: 'none',
   },
   '.cm-markdown-cover.cm-markdown-cover-top': {
-    marginTop: 'calc(0px - var(--space-md))',
+    marginTop: '0',
+  },
+  '.cm-markdown-cover.cm-markdown-cover-bleed-x': {
     marginLeft: 'calc(0px - var(--editor-markdown-content-padding-x))',
     marginRight: 'calc(0px - var(--editor-markdown-content-padding-x))',
     width: 'calc(100% + var(--editor-markdown-content-padding-x) + var(--editor-markdown-content-padding-x))',

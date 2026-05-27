@@ -43,6 +43,7 @@ describe('markdown cover editor field', () => {
 
     expect(cover).toBeInstanceOf(HTMLElement);
     expect(cover?.classList.contains('cm-markdown-cover-top')).toBe(true);
+    expect(view.dom.classList.contains('cm-markdown-has-top-cover')).toBe(true);
     expect(cover?.style.width).toBe('72%');
     expect(cover?.style.height).toBe('280px');
     expect(parent.textContent).not.toContain('cover:');
@@ -81,6 +82,7 @@ describe('markdown cover editor field', () => {
 
     expect(parent.querySelector('.cm-markdown-cover')).toBeInstanceOf(HTMLElement);
     expect(parent.querySelector('.cm-markdown-cover')?.classList.contains('cm-markdown-cover-top')).toBe(false);
+    expect(view.dom.classList.contains('cm-markdown-has-top-cover')).toBe(false);
     expect(parent.textContent).toContain('title: Demo Note');
     expect(parent.textContent).toContain('tags:');
     expect(parent.textContent).not.toContain('cover:');
@@ -88,7 +90,7 @@ describe('markdown cover editor field', () => {
     view.destroy();
   });
 
-  it('lets full-width covers bleed through editor content padding', () => {
+  it('marks full-width covers as horizontal bleed blocks', () => {
     const parent = document.createElement('div');
     document.body.appendChild(parent);
     const view = new EditorView({
@@ -113,10 +115,11 @@ describe('markdown cover editor field', () => {
 
     const cover = parent.querySelector('.cm-markdown-cover') as HTMLElement | null;
 
-    expect(cover?.style.width).toBe('calc(100% + var(--editor-markdown-content-padding-x) + var(--editor-markdown-content-padding-x))');
     expect(cover?.classList.contains('cm-markdown-cover-top')).toBe(true);
-    expect(cover?.style.marginLeft).toBe('calc(0px - var(--editor-markdown-content-padding-x))');
-    expect(cover?.style.marginRight).toBe('calc(0px - var(--editor-markdown-content-padding-x))');
+    expect(cover?.classList.contains('cm-markdown-cover-bleed-x')).toBe(true);
+    expect(cover?.style.width).toBe('');
+    expect(cover?.style.marginLeft).toBe('');
+    expect(cover?.style.marginRight).toBe('');
 
     view.destroy();
   });
