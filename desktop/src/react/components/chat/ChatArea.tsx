@@ -11,6 +11,7 @@ import { useStore } from '../../stores';
 import { loadMoreMessages } from '../../stores/session-actions';
 import { captureChatSelection } from '../../stores/selection-actions';
 import { useContinuousBottomScroll } from '../../hooks/use-continuous-bottom-scroll';
+import { useBoxSelection } from '../../hooks/use-box-selection';
 
 const EMPTY_ITEMS: ChatListItem[] = [];
 import type { ChatListItem } from '../../stores/chat-types';
@@ -100,6 +101,14 @@ const Panel = memo(function Panel({ path, active }: { path: string; active: bool
       messageElementsRef.current.delete(messageId);
     }
   }, []);
+  const orderedIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const it of items) {
+      if (it.type === 'message') ids.push(it.data.id);
+    }
+    return ids;
+  }, [items]);
+  const boxSelection = useBoxSelection({ messageElementsRef, orderedIds, sessionPath: path });
   const handleCaptureSelection = useCallback(() => {
     if (!active) return;
     captureChatSelection(path);
@@ -226,10 +235,15 @@ const Panel = memo(function Panel({ path, active }: { path: string; active: bool
         className={styles.sessionPanel}
         data-chat-selection-root=""
         data-session-path={path}
+        onPointerDown={boxSelection.onPointerDown}
+        onClickCapture={boxSelection.onClickCapture}
         onMouseUp={handleCaptureSelection}
         onKeyUp={handleCaptureSelection}
       >
-        <div ref={contentRef} className={styles.sessionMessages}>
+        <div
+          ref={contentRef}
+          className={`${styles.sessionMessages}${boxSelection.selectionModeActive ? ` ${styles.selectionModeActive}` : ''}`}
+        >
           {hasMore && (
             <div className={styles.loadMoreHint}>
               {loadingMore ? '...' : ''}
@@ -255,6 +269,17 @@ const Panel = memo(function Panel({ path, active }: { path: string; active: bool
         active={active}
         railVisible={timelineRailVisible}
       />
+      {boxSelection.box && (
+        <div
+          className={styles.selectionBox}
+          style={{
+            left: boxSelection.box.left,
+            top: boxSelection.box.top,
+            width: boxSelection.box.right - boxSelection.box.left,
+            height: boxSelection.box.bottom - boxSelection.box.top,
+          }}
+        />
+      )}
     </div>
   );
 });
