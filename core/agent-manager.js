@@ -723,6 +723,11 @@ export class AgentManager {
     } catch (err) {
       log.warn(`复用实例账本清理失败 (${agentId}): ${err.message}`);
     }
+    try {
+      this._d.getEngine?.()?.subagentThreads?.removeByAgentId?.(agentId);
+    } catch (err) {
+      log.warn(`subagent 线程账本清理失败 (${agentId}): ${err.message}`);
+    }
 
     if (this._d.hanakoHome) {
       try {
@@ -845,6 +850,7 @@ export class AgentManager {
       emitSessionEvent:     (event) => getEngine()?.emitSessionEvent?.(event),
       getDeferredResults:   () => getEngine()?.deferredResults ?? null,
       getSubagentRunStore:  () => getEngine()?.subagentRuns ?? null,
+      getSubagentThreadStore: () => getEngine()?.subagentThreads ?? null,
       getReusableSubagentStore: () => getEngine()?.reusableSubagents ?? null,
       getActivityHub:       () => getEngine()?.activityHub ?? null,
       getTaskRegistry:      () => getEngine()?.taskRegistry ?? null,

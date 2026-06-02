@@ -76,6 +76,7 @@ import { configureProcessPiSdkEnv, ensureHanaPiSdkDirs, resolveHanakoHome } from
 import { ConfirmStore } from "../lib/confirm-store.js";
 import { DeferredResultStore } from "../lib/deferred-result-store.js";
 import { SubagentRunStore } from "../lib/subagent-run-store.js";
+import { SubagentThreadStore } from "../lib/subagent-thread-store.js";
 import { ReusableSubagentStore } from "../lib/reusable-subagent-store.js";
 import { ActivityHub } from "../lib/activity-hub.js";
 import { WorkflowActivityStore } from "../lib/workflow-activity-store.js";
@@ -415,6 +416,11 @@ const subagentRunStore = new SubagentRunStore(
   path.join(hanakoHome, "subagent-runs.json"),
 );
 engine.setSubagentRunStore(subagentRunStore);
+
+const subagentThreadStore = new SubagentThreadStore(
+  path.join(hanakoHome, "subagent-threads.json"),
+);
+engine.setSubagentThreadStore(subagentThreadStore);
 
 // 复用 subagent 实例账本（按 reuseKey 记稳定 childSessionPath + 串行锁）：
 // 单例，跨所有 per-agent subagent 工具闭包共享，保证复用实例全局串行。

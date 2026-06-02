@@ -98,6 +98,52 @@ describe("subagent-tool (executeIsolated 原子模式)", () => {
     );
   });
 
+  it("不带 instance 也登记 ephemeral thread，并把 run 关联到 threadId", async () => {
+    const threadStore = {
+      beginRun: vi.fn(),
+      attachSession: vi.fn(),
+      finishRun: vi.fn(),
+    };
+    const runStore = {
+      register: vi.fn(),
+      attachSession: vi.fn(),
+      resolve: vi.fn(),
+      fail: vi.fn(),
+      abort: vi.fn(),
+    };
+    const tool = createSubagentTool(makeDeps({
+      getDeferredStore: () => mockStore,
+      getSubagentRunStore: () => runStore,
+      getSubagentThreadStore: () => threadStore,
+    }));
+
+    const result = await tool.execute("call_1", { task: "读代码", agent: "other-agent" }, null, null, mockCtx());
+    const taskId = result.details.taskId;
+
+    expect(result.details.threadId).toBe(taskId);
+    expect(result.details.threadKind).toBe("ephemeral");
+    expect(threadStore.beginRun).toHaveBeenCalledWith(taskId, expect.objectContaining({
+      kind: "ephemeral",
+      parentSessionPath: "/test/session.jsonl",
+      agentId: "other-agent",
+      summary: "读代码",
+    }));
+    expect(runStore.register).toHaveBeenCalledWith(taskId, expect.objectContaining({
+      threadId: taskId,
+      threadKind: "ephemeral",
+    }));
+
+    await vi.waitFor(() => {
+      expect(threadStore.attachSession).toHaveBeenCalledWith(taskId, "/test/child.jsonl", expect.objectContaining({
+        agentId: "other-agent",
+      }));
+      expect(threadStore.finishRun).toHaveBeenCalledWith(taskId, expect.objectContaining({
+        status: "resolved",
+        close: true,
+      }));
+    });
+  });
+
   it("默认甲（Codex）：派单不剥离工具（无 toolFilter/builtinFilter）+ permissionMode operate + subagentContext", async () => {
     const capture = makeExecuteIsolated();
     const tool = createSubagentTool(makeDeps({ executeIsolated: capture, getDeferredStore: () => mockStore }));
@@ -772,11 +818,13 @@ describe("subagent-tool 复用模式 (instance)", () => {
 
   it("首跑：persist 指向 reusable 目录、无 resumeSessionPath、subagentContext 仍剥离记忆、beginRun 落库", async () => {
     const reuseStore = new ReusableSubagentStore();
+    const threadStore = { beginRun: vi.fn(), attachSession: vi.fn(), finishRun: vi.fn() };
     const capture = makeExecuteIsolated({ replyText: "ok", error: null, sessionPath: "/test/child.jsonl" });
     const tool = createSubagentTool(makeDeps({
       executeIsolated: capture,
       getDeferredStore: () => mockStore,
       getReusableSubagentStore: () => reuseStore,
+      getSubagentThreadStore: () => threadStore,
     }));
 
     const res = await tool.execute("c1", { task: "探索任务", agent: "other-agent", instance: "探索" }, null, null, mockCtx());
@@ -792,6 +840,20 @@ describe("subagent-tool 复用模式 (instance)", () => {
       const rec = reuseStore.get(REUSE_KEY);
       expect(rec?.childSessionPath).toBe("/test/child.jsonl");
       expect(rec?.runCount).toBe(1);
+    });
+    const threadId = `reusable::${REUSE_KEY}`;
+    expect(res.details.threadId).toBe(threadId);
+    expect(res.details.threadKind).toBe("reusable");
+    expect(threadStore.beginRun).toHaveBeenCalledWith(threadId, expect.objectContaining({
+      kind: "reusable",
+      reuseKey: REUSE_KEY,
+      instance: "探索",
+    }));
+    await vi.waitFor(() => {
+      expect(threadStore.finishRun).toHaveBeenCalledWith(threadId, expect.objectContaining({
+        status: "resolved",
+        close: false,
+      }));
     });
   });
 

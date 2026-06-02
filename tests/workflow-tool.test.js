@@ -189,6 +189,42 @@ describe("workflow tool", () => {
     expect(upserts.find((e) => e.id === childId && e.status === "done")).toBeTruthy();
   });
 
+  it("脚本里 agent() → SubagentThreadStore 登记 workflow_node thread 并在完成后关闭", async () => {
+    const store = makeStore();
+    const threadStore = {
+      beginRun: vi.fn(),
+      attachSession: vi.fn(),
+      finishRun: vi.fn(),
+    };
+    const tool = createWorkflowTool({
+      executeIsolated: async (p, o) => { o.onSessionReady?.("/child.jsonl"); return { replyText: "x", error: null }; },
+      getAgentId: () => "a1", emitEvent: () => {},
+      getDeferredStore: () => store,
+      getSubagentRunStore: () => makeRunStore(),
+      getSubagentThreadStore: () => threadStore,
+    });
+
+    const res = await tool.execute("c1", { script: META + `return await agent('x', { label: '探索' })` }, undefined, undefined, makeCtx());
+    await flush();
+    const threadId = `${res.details.taskId}::node-1`;
+
+    expect(threadStore.beginRun).toHaveBeenCalledWith(threadId, expect.objectContaining({
+      kind: "workflow_node",
+      parentTaskId: res.details.taskId,
+      nodeId: "node-1",
+      parentSessionPath: "/s.jsonl",
+      agentId: "a1",
+      label: "探索",
+    }));
+    expect(threadStore.attachSession).toHaveBeenCalledWith(threadId, "/child.jsonl", expect.objectContaining({
+      parentTaskId: res.details.taskId,
+    }));
+    expect(threadStore.finishRun).toHaveBeenCalledWith(threadId, expect.objectContaining({
+      status: "resolved",
+      close: true,
+    }));
+  });
+
   it("节点 done 从 UsageLedger 按 childSessionPath 汇总 token 写入子 entry", async () => {
     const store = makeStore();
     const upserts = [];
@@ -218,5 +254,38 @@ describe("workflow tool", () => {
     const childId = `${res.details.taskId}::node-1`;
     const done = upserts.find((e) => e.id === childId && e.status === "done");
     expect(done.tokens).toBe(1234); // 1000 + 234
+  });
+
+  it("workflow agent fan-out 使用独立高并发上限，能同时启动几十个一次性节点", async () => {
+    const store = makeStore();
+    let active = 0;
+    let peak = 0;
+    const releases = [];
+    const exec = vi.fn(async () => {
+      active += 1;
+      peak = Math.max(peak, active);
+      await new Promise((resolve) => releases.push(resolve));
+      active -= 1;
+      return { replyText: "x", error: null };
+    });
+    const tool = createWorkflowTool({
+      executeIsolated: exec,
+      getAgentId: () => "a1",
+      emitEvent: () => {},
+      getDeferredStore: () => store,
+      getSubagentRunStore: () => makeRunStore(),
+    });
+
+    await tool.execute(
+      "c1",
+      { script: META + `return await parallel(Array.from({ length: 64 }, (_, i) => () => agent('x' + i)))` },
+      undefined,
+      undefined,
+      makeCtx(),
+    );
+    await vi.waitFor(() => expect(exec.mock.calls.length).toBeGreaterThanOrEqual(64));
+    expect(peak).toBeGreaterThanOrEqual(64);
+    releases.forEach((release) => release());
+    await flush();
   });
 });

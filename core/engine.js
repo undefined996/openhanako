@@ -466,6 +466,14 @@ export class HanaEngine {
     return this._reusableSubagentStore || null;
   }
 
+  setSubagentThreadStore(store) {
+    this._subagentThreadStore = store || null;
+  }
+
+  get subagentThreads() {
+    return this._subagentThreadStore || null;
+  }
+
   setActivityHub(hub) {
     this._activityHub = hub || null;
   }

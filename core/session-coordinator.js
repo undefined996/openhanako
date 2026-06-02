@@ -2811,6 +2811,8 @@ export class SessionCoordinator {
                 agentId: targetAgent.id || null,
                 sessionPath: childSessionPath,
                 taskId: opts.subagentTaskId || null,
+                threadId: opts.subagentThreadId || null,
+                threadKind: opts.subagentThreadKind || null,
               },
             } : {}),
             ...(parentSessionPath ? {
@@ -2828,6 +2830,8 @@ export class SessionCoordinator {
                 childAgentId: opts.subagentContext ? targetAgent.id || null : undefined,
                 childSessionPath: opts.subagentContext ? childSessionPath : undefined,
                 taskId: opts.subagentContext ? opts.subagentTaskId || null : undefined,
+                threadId: opts.subagentContext ? opts.subagentThreadId || null : undefined,
+                threadKind: opts.subagentContext ? opts.subagentThreadKind || null : undefined,
               }
             : { kind: opts.subagentContext ? "utility" : "automation", agentId: targetAgent.id || null },
         });

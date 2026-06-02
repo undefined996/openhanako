@@ -333,6 +333,11 @@ export function createSessionsRoute(engine, hub = null) {
         lifecycleLog.warn(`reusable subagent cleanup failed for ${sessionPath}: ${err.message}`);
       }
       try {
+        engine.subagentThreads?.removeBySession?.(sessionPath);
+      } catch (err) {
+        lifecycleLog.warn(`subagent thread cleanup failed for ${sessionPath}: ${err.message}`);
+      }
+      try {
         // 右侧 workflow 卡活动随对话退场（内存 + 持久化背书一并清，按 sessionPath 归属）。
         engine.activityHub?.clearBySession?.(sessionPath);
       } catch (err) {

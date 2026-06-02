@@ -24,6 +24,7 @@ import {
 } from "../lib/subagent-executor-metadata.js";
 import { SessionFileRegistry } from "../lib/session-files/session-file-registry.js";
 import { SubagentRunStore } from "../lib/subagent-run-store.js";
+import { SubagentThreadStore } from "../lib/subagent-thread-store.js";
 import { persistBrowserScreenshotFileSync } from "../lib/session-files/browser-screenshot-file.js";
 import { getInvalidProviderModelIds } from "../shared/provider-model-validation.js";
 import { normalizeThinkingLevelForModel } from "./session-thinking-level.js";
@@ -114,6 +115,8 @@ const migrations = {
   34: migrateWorkflowDefaultExplicitOff,
   // MiniMax Token Plan 官方入口迁到 Anthropic-compatible endpoint，但保留独立 provider 边界
   35: migrateMiniMaxTokenPlanAnthropicEndpoint,
+  // subagent thread/run 分层：从旧 run/reusable 账本迁出显式 thread registry
+  36: migrateSubagentThreadRegistry,
 };
 
 // ── Runner ──────────────────────────────────────────────────────────────────
@@ -2710,6 +2713,80 @@ function migrateDurableSubagentRunRegistry(ctx) {
   }
 
   log?.(`[migrations] #28: durable subagent run registry backfilled (${imported})`);
+}
+
+function readJsonForMigration(filePath) {
+  if (!fs.existsSync(filePath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
+function normalizeMigratedRunStatus(status) {
+  if (status === "resolved" || status === "failed" || status === "aborted") return status;
+  return "failed";
+}
+
+function migrateSubagentThreadRegistry(ctx) {
+  const { hanakoHome, log } = ctx;
+  const threadStore = new SubagentThreadStore(path.join(hanakoHome, "subagent-threads.json"));
+  const runStore = new SubagentRunStore(path.join(hanakoHome, "subagent-runs.json"));
+  let importedRuns = 0;
+  let importedReusable = 0;
+
+  for (const run of runStore.list()) {
+    if (!run?.taskId || !String(run.taskId).startsWith("subagent-")) continue;
+    if (!run.childSessionPath) continue;
+    const threadId = run.threadId || run.taskId;
+    const status = normalizeMigratedRunStatus(run.status);
+    threadStore.beginRun(threadId, {
+      kind: "ephemeral",
+      parentSessionPath: run.parentSessionPath || null,
+      agentId: run.executorAgentId || run.requestedAgentId || null,
+      agentName: run.executorAgentNameSnapshot || run.requestedAgentNameSnapshot || null,
+      summary: run.summary || null,
+    });
+    threadStore.attachSession(threadId, run.childSessionPath, {
+      parentSessionPath: run.parentSessionPath || null,
+      agentId: run.executorAgentId || run.requestedAgentId || null,
+      agentName: run.executorAgentNameSnapshot || run.requestedAgentNameSnapshot || null,
+    });
+    threadStore.finishRun(threadId, {
+      status,
+      summary: run.summary || run.reason || null,
+      close: true,
+    });
+    runStore.upsert(run.taskId, { threadId, threadKind: "ephemeral" });
+    importedRuns += 1;
+  }
+
+  const reusableRaw = readJsonForMigration(path.join(hanakoHome, "reusable-subagents.json"));
+  const instances = reusableRaw?.instances && typeof reusableRaw.instances === "object"
+    ? reusableRaw.instances
+    : {};
+  for (const [reuseKey, rec] of Object.entries(instances)) {
+    if (!reuseKey || !rec || typeof rec !== "object") continue;
+    const threadId = `reusable::${reuseKey}`;
+    threadStore.upsert(threadId, {
+      kind: "reusable",
+      status: "open",
+      lastRunStatus: normalizeMigratedRunStatus(rec.lastStatus),
+      parentSessionPath: rec.parentSessionPath || null,
+      agentId: rec.agentId || null,
+      childSessionPath: rec.childSessionPath || null,
+      instance: rec.taskSuffix || null,
+      reuseKey,
+      summary: rec.summary || null,
+      runCount: rec.runCount || 0,
+      createdAt: rec.createdAt || null,
+      lastRunAt: rec.lastRunAt || null,
+    });
+    importedReusable += 1;
+  }
+
+  log?.(`[migrations] #36: subagent thread registry backfilled (runs=${importedRuns}, reusable=${importedReusable})`);
 }
 
 function migrateLegacyApiKeyAuthEntriesToProviders(ctx) {

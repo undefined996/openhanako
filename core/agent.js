@@ -482,6 +482,7 @@ export class Agent {
       resolveUtilityModel: () => this._cb?.getCurrentModelId?.() || null,
       getDeferredStore: () => this._cb?.getDeferredResults?.(),
       getSubagentRunStore: () => this._cb?.getSubagentRunStore?.(),
+      getSubagentThreadStore: () => this._cb?.getSubagentThreadStore?.(),
       getReusableSubagentStore: () => this._cb?.getReusableSubagentStore?.(),
       getActivityHub: () => this._cb?.getActivityHub?.(),
       getTaskRegistry: () => this._cb?.getTaskRegistry?.(),
@@ -520,6 +521,7 @@ export class Agent {
       // 完成后由 DeferredResultCoordinator 回灌主对话。
       getDeferredStore: () => this._cb?.getDeferredResults?.(),
       getSubagentRunStore: () => this._cb?.getSubagentRunStore?.(),
+      getSubagentThreadStore: () => this._cb?.getSubagentThreadStore?.(),
       getActivityHub: () => this._cb?.getActivityHub?.(),
       // 节点 token：从 UsageLedger 按子节点 session 汇总（usage 已在 executeIsolated 采集）。
       getUsageLedger: () => this._cb?.getEngine?.()?.usageLedger,
