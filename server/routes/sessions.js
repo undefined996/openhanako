@@ -43,7 +43,6 @@ import {
   sessionFileSidecarPath,
 } from "../../lib/session-files/session-file-registry.js";
 import { serializeSessionFile } from "../../lib/session-files/session-file-response.js";
-import { deleteSessionSkillSnapshotSync } from "../../lib/skills/session-skill-snapshot.js";
 import { browserScreenshotPath } from "../../lib/session-files/browser-screenshot-file.js";
 import { modelSupportsXhigh } from "../../core/session-thinking-level.js";
 import {
@@ -1095,7 +1094,6 @@ export function createSessionsRoute(engine, hub = null) {
               await cleanupSessionLifecycle([activeKey, fp], "parent session deleted");
               await fs.unlink(fp);
               deleteSessionFileSidecarSync(fp);
-              deleteSessionSkillSnapshotSync(fp);
               deleted++;
               // 清理 titles.json 孤儿（key = 对应的活跃路径）
               try { await engine.clearSessionTitle(activeKey); } catch {}
@@ -1231,7 +1229,6 @@ export function createSessionsRoute(engine, hub = null) {
       try {
         await fs.unlink(sessionPath);
         deleteSessionFileSidecarSync(sessionPath);
-        deleteSessionSkillSnapshotSync(sessionPath);
       } catch (err) {
         if (err.code === "ENOENT") {
           return c.json({ error: t("error.sessionNotFound") }, 404);
