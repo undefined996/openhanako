@@ -236,4 +236,55 @@ describe('screenshot utils', () => {
     expect(payload.messages[1].avatarDataUrl).toMatch(/^data:image\/png;base64,/);
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('assets/Hanako.png'));
   });
+
+  it('用户消息截图 payload 保留非图片附件的语义块', async () => {
+    const sessionPath = '/session/attachments.jsonl';
+    storeMock.state = {
+      ...storeMock.state,
+      selectedIdsBySession: {
+        [sessionPath]: ['u1'],
+      },
+      chatSessions: {
+        [sessionPath]: {
+          hasMore: false,
+          loadingMore: false,
+          items: [
+            {
+              type: 'message',
+              data: {
+                id: 'u1',
+                role: 'user',
+                text: '附件在这里',
+                attachments: [
+                  {
+                    path: '/tmp/voice.wav',
+                    name: 'voice.wav',
+                    isDir: false,
+                    mimeType: 'audio/wav',
+                    presentation: 'voice-input',
+                    listed: false,
+                  },
+                  { path: '/tmp/readme.md', name: 'readme.md', isDir: false, mimeType: 'text/markdown' },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    };
+    (window as any).hana = {
+      screenshotRender: vi.fn().mockResolvedValue({ success: true, dir: '/tmp/hana-home/截图' }),
+      getServerPort: vi.fn().mockResolvedValue(null),
+      getServerToken: vi.fn().mockResolvedValue(null),
+    };
+
+    await expect(takeScreenshot('u1', sessionPath)).resolves.toBeUndefined();
+
+    const payload = (window as any).hana.screenshotRender.mock.calls[0][0];
+    expect(payload.messages[0].blocks).toEqual([
+      { type: 'markdown', content: '附件在这里' },
+      { type: 'attachment', kind: 'audio', name: 'voice.wav', presentation: 'voice-input' },
+      { type: 'attachment', kind: 'markdown', name: 'readme.md' },
+    ]);
+  });
 });
