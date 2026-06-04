@@ -207,10 +207,21 @@
     background: var(--overlay-light);
 }
 
+.previewPanelBody :global(.markdown-cover-menu button.markdown-cover-menu-danger) {
+    margin-top: 4px;
+    border-top: 1px solid var(--overlay-light);
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+    color: var(--danger, #b45a5a);
+}
+
 .previewPanelBody :global(.preview-markdown) h1 {
     text-align: center;
     font-size: var(--editor-markdown-h1-font-size);
     font-weight: 700;
+}
+
+.previewPanelBody :global(.preview-markdown.markdown-has-cover) h1 {
+    text-align: left;
 }
 
 .previewPanelBody :global(.preview-markdown) h2 {

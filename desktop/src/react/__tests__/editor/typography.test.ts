@@ -112,6 +112,7 @@ describe('editor typography settings', () => {
     expect(css).toMatch(/:global\(\.preview-markdown\)\s*\{[\s\S]*font-family:\s*var\(--editor-markdown-font-family,\s*var\(--font-serif\)\)/);
     expect(css).toMatch(/:global\(\.preview-markdown\)\s*\{[\s\S]*font-weight:\s*400/);
     expect(css).toMatch(/:global\(\.preview-markdown\) h1\s*\{[\s\S]*font-size:\s*var\(--editor-markdown-h1-font-size\)[\s\S]*font-weight:\s*700/);
+    expect(css).toMatch(/:global\(\.preview-markdown\.markdown-has-cover\) h1\s*\{[\s\S]*text-align:\s*left/);
 
     for (const level of [2, 3, 4, 5, 6]) {
       expect(css).toMatch(new RegExp(

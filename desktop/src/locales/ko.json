@@ -1,6 +1,6 @@
 {
   "cover": {
-    "make": "cover 만들기",
+    "make": "커버 추가",
     "agentGenerate": {
       "beautifyDisabled": "먼저 메인 에이전트의 도구 설정에서 '小花美术'를 활성화하세요.",
       "defaultModelMissing": "먼저 설정에서 기본 이미지 모델을 구성하세요.",

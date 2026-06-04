@@ -35,6 +35,7 @@ export interface QuotedSelection {
   sourceRole?: 'user' | 'assistant';
   lineStart?: number;
   lineEnd?: number;
+  selectionAnchorKind?: 'native' | 'codemirror';
   charCount: number;
   anchorRect?: FloatingAnchorRect;
   updatedAt?: number;

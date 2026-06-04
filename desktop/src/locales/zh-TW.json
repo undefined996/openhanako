@@ -1,6 +1,6 @@
 {
   "cover": {
-    "make": "製作 cover",
+    "make": "新增封面",
     "agentGenerate": {
       "beautifyDisabled": "需要先在主 Agent 的工具設定裡開啟小花美术。",
       "defaultModelMissing": "需要先在設定裡設定預設圖片模型。",

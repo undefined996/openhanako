@@ -1,6 +1,6 @@
 {
   "cover": {
-    "make": "Make cover",
+    "make": "Add cover",
     "agentGenerate": {
       "beautifyDisabled": "Enable 小花美术 in the main agent's tool settings first.",
       "defaultModelMissing": "Configure a default image model in settings first.",
