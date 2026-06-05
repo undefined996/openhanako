@@ -56,20 +56,15 @@ describe('ThinkingLevelButton', () => {
     expect(onChange).toHaveBeenCalledWith('high');
   });
 
-  it('keeps pending new-session thinking changes on the global default path', async () => {
-    vi.mocked(hanaFetch).mockResolvedValueOnce(jsonResponse({ ok: true }));
+  it('keeps pending new-session thinking changes as a local draft', async () => {
     const onChange = vi.fn();
 
     const { container } = render(<ThinkingLevelButton level="medium" onChange={onChange} modelXhigh={false} />);
     fireEvent.click(container.querySelector('button') as HTMLButtonElement);
     fireEvent.click(screen.getByRole('button', { name: 'high' }));
 
-    await waitFor(() => {
-      expect(hanaFetch).toHaveBeenCalledWith('/api/config', expect.objectContaining({
-        method: 'PUT',
-        body: JSON.stringify({ thinking_level: 'high' }),
-      }));
-    });
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith('high'));
+    expect(hanaFetch).not.toHaveBeenCalled();
     expect(onChange).toHaveBeenCalledWith('high');
   });
 

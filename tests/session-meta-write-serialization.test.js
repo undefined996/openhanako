@@ -189,6 +189,37 @@ describe("SessionCoordinator.writeSessionMeta serialization", () => {
     expect(meta[path.basename(fakeSessionPath)].pinnedAt).toBeNull();
   });
 
+  it("setSessionPinned emits a scoped session metadata update", async () => {
+    const pinnedAt = await sessionCoord.setSessionPinned(fakeSessionPath, true);
+
+    expect(sessionCoord._d.emitEvent).toHaveBeenCalledWith({
+      type: "session_metadata_updated",
+      metadata: { pinnedAt },
+    }, fakeSessionPath);
+
+    await sessionCoord.setSessionPinned(fakeSessionPath, false);
+
+    expect(sessionCoord._d.emitEvent).toHaveBeenLastCalledWith({
+      type: "session_metadata_updated",
+      metadata: { pinnedAt: null },
+    }, fakeSessionPath);
+  });
+
+  it("setSessionThinkingLevel writes meta and emits a scoped session metadata update", async () => {
+    sessionCoord._hibernatedSessionMeta.set(fakeSessionPath, { thinkingLevel: "medium" });
+
+    const result = await sessionCoord.setSessionThinkingLevel(fakeSessionPath, "high");
+
+    const metaPath = path.join(sessionDir, "session-meta.json");
+    const meta = JSON.parse(await fsp.readFile(metaPath, "utf-8"));
+    expect(result).toEqual({ ok: true, thinkingLevel: "high" });
+    expect(meta[path.basename(fakeSessionPath)].thinkingLevel).toBe("high");
+    expect(sessionCoord._d.emitEvent).toHaveBeenCalledWith({
+      type: "session_metadata_updated",
+      metadata: { thinkingLevel: "high" },
+    }, fakeSessionPath);
+  });
+
   it("listSessions exposes pinnedAt from the session directory sidecar", async () => {
     const agentsDir = path.join(tmpDir, "agents");
     const agentSessionDir = path.join(agentsDir, "hana", "sessions");

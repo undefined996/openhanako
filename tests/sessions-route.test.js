@@ -139,6 +139,7 @@ describe("sessions route", () => {
       updateConfig: vi.fn(async (patch) => Object.assign(engine.config, patch)),
       getAgent: vi.fn(() => ({ agentName: "Hana" })),
       getSessionWorkspaceFolders: vi.fn(() => [extra]),
+      getSessionThinkingLevel: vi.fn(() => "high"),
     };
 
     app.route("/api", createSessionsRoute(engine, hub));
@@ -146,7 +147,7 @@ describe("sessions route", () => {
     const res = await app.request("/api/sessions/new", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cwd, workspaceFolders: [extra] }),
+      body: JSON.stringify({ cwd, workspaceFolders: [extra], thinkingLevel: "high" }),
     });
     const data = await res.json();
 
@@ -156,13 +157,13 @@ describe("sessions route", () => {
       cwd,
       true,
       undefined,
-      { workspaceFolders: [extra], visibleInSessionList: true },
+      { workspaceFolders: [extra], visibleInSessionList: true, thinkingLevel: "high" },
     );
     expect(data.workspaceFolders).toEqual([extra]);
     expect(hub.eventBus.emit).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "session_created",
-        session: expect.objectContaining({ path: "/tmp/agents/hana/sessions/new.jsonl" }),
+        session: expect.objectContaining({ path: "/tmp/agents/hana/sessions/new.jsonl", thinkingLevel: "high" }),
       }),
       "/tmp/agents/hana/sessions/new.jsonl",
     );

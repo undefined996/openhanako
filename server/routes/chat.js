@@ -817,6 +817,12 @@ export function createChatRoute(engine, hub, { upgradeWebSocket }) {
         sessionKey: event.sessionKey,
         sessionPath,
       });
+    } else if (event.type === "session_metadata_updated") {
+      broadcast({
+        type: "session_metadata_updated",
+        sessionPath,
+        metadata: event.metadata && typeof event.metadata === "object" ? event.metadata : {},
+      });
     } else if (event.type === "permission_mode") {
       broadcast({ type: "permission_mode", mode: event.mode, readOnly: event.readOnly === true, sessionPath });
     } else if (event.type === "access_mode") {

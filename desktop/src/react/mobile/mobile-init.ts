@@ -205,6 +205,7 @@ export async function createMobileSession(): Promise<string | null> {
   };
   if (state.selectedFolder) body.cwd = state.selectedFolder;
   if (state.workspaceFolders?.length) body.workspaceFolders = state.workspaceFolders;
+  if (state.pendingNewSessionThinkingLevel) body.thinkingLevel = state.pendingNewSessionThinkingLevel;
   if (state.selectedAgentId && state.selectedAgentId !== state.currentAgentId) {
     body.agentId = state.selectedAgentId;
   }
@@ -228,6 +229,7 @@ export async function createMobileSession(): Promise<string | null> {
     pendingSessionSwitchPath: null,
     pendingNewSession: false,
     welcomeVisible: false,
+    pendingNewSessionThinkingLevel: null,
     workspaceFolders: Array.isArray(data.workspaceFolders) ? data.workspaceFolders : [],
     selectedAgentId: null,
   };

@@ -1047,7 +1047,7 @@ export function createSessionsRoute(engine, hub = null) {
       });
       if (!auth.allowed) return c.json({ error: "insufficient_scope", reason: auth.reason }, 403);
       const body = await safeJson(c);
-      const { cwd, memoryEnabled, agentId, currentSessionPath: oldSessionPath } = body;
+      const { cwd, memoryEnabled, agentId, currentSessionPath: oldSessionPath, thinkingLevel } = body;
       const workspaceFolders = Array.isArray(body.workspaceFolders)
         ? body.workspaceFolders.filter(p => typeof p === "string" && p.trim())
         : [];
@@ -1071,6 +1071,10 @@ export function createSessionsRoute(engine, hub = null) {
         await bm.suspendForSession(oldSessionPath);
       }
 
+      const createOptions = { workspaceFolders, visibleInSessionList: true };
+      if (thinkingLevel !== undefined && thinkingLevel !== null) {
+        createOptions.thinkingLevel = thinkingLevel;
+      }
       let newSessionPath, newAgentId;
       if (agentId && agentId !== (body.currentAgentId || engine.currentAgentId)) {
         ({ sessionPath: newSessionPath, agentId: newAgentId } = await engine.createSessionForAgent(
@@ -1078,7 +1082,7 @@ export function createSessionsRoute(engine, hub = null) {
           cwd || undefined,
           memFlag,
           undefined,
-          { workspaceFolders, visibleInSessionList: true },
+          createOptions,
         ));
       } else {
         ({ sessionPath: newSessionPath, agentId: newAgentId } = await engine.createSession(
@@ -1086,7 +1090,7 @@ export function createSessionsRoute(engine, hub = null) {
           cwd || undefined,
           memFlag,
           undefined,
-          { workspaceFolders, visibleInSessionList: true },
+          createOptions,
         ));
       }
       engine.persistSessionMeta();
@@ -1139,20 +1143,25 @@ export function createSessionsRoute(engine, hub = null) {
       }
 
       const body = await safeJson(c);
-      const { cwd, memoryEnabled, agentId, permissionMode } = body;
+      const { cwd, memoryEnabled, agentId, permissionMode, thinkingLevel } = body;
       const workspaceFolders = Array.isArray(body.workspaceFolders)
         ? body.workspaceFolders.filter(p => typeof p === "string" && p.trim())
         : [];
       const memFlag = memoryEnabled !== false;
 
-      const result = await engine.createDetachedSession({
+      const detachedOptions = {
         cwd: cwd || undefined,
         memoryEnabled: memFlag,
         agentId: typeof agentId === "string" && agentId.trim() ? agentId.trim() : null,
         workspaceFolders,
         visibleInSessionList: true,
         permissionMode: permissionMode || null,
-      });
+      };
+      if (thinkingLevel !== undefined && thinkingLevel !== null) {
+        detachedOptions.thinkingLevel = thinkingLevel;
+      }
+
+      const result = await engine.createDetachedSession(detachedOptions);
       const newSessionPath = result.sessionPath;
       const newAgentId = result.agentId;
       engine.persistSessionMeta?.();

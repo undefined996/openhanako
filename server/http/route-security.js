@@ -116,7 +116,7 @@ export function classifyHttpRoute({ method = "GET", path = "" } = {}) {
     return (verb === "GET" || verb === "POST") ? scoped("chat") : LOCAL_ONLY;
   }
   if (routePath === "/api/session-thinking-level") {
-    return verb === "POST" ? scoped("chat") : LOCAL_ONLY;
+    return (verb === "GET" || verb === "POST") ? scoped("chat") : LOCAL_ONLY;
   }
   if (/^\/api\/confirm\/[^/]+$/.test(routePath)) {
     return verb === "POST" ? scoped("chat") : LOCAL_ONLY;

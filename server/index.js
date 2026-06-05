@@ -774,10 +774,16 @@ app.get("/api/session-permission-mode", async (c) => {
   });
 });
 
+app.get("/api/session-thinking-level", async (c) => {
+  return c.json({
+    thinkingLevel: engine.getThinkingLevel?.() || "medium",
+  });
+});
+
 app.post("/api/session-thinking-level", async (c) => {
   const { sessionPath, level } = await safeJson(c);
   if (!sessionPath) return c.json({ error: "sessionPath required" }, 400);
-  const result = engine.setSessionThinkingLevel(sessionPath, level);
+  const result = await engine.setSessionThinkingLevel(sessionPath, level);
   if (result?.ok === false) {
     return c.json({
       ok: false,

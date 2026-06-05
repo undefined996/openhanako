@@ -130,6 +130,90 @@ describe("SessionCoordinator", () => {
     expect(createAgentSessionMock.mock.calls[0][0].resourceLoader.getSystemPrompt()).toBe("MEMORY OFF");
   });
 
+  it("uses explicit new-session thinking without changing the global default", async () => {
+    const agentDir = path.join(tempDir, "agents", "hana");
+    const sessionDir = path.join(agentDir, "sessions");
+    const firstSessionPath = path.join(sessionDir, "first.jsonl");
+    const secondSessionPath = path.join(sessionDir, "second.jsonl");
+    fs.mkdirSync(sessionDir, { recursive: true });
+
+    const agent = {
+      id: "hana",
+      agentDir,
+      sessionDir,
+      sessionMemoryEnabled: true,
+      memoryMasterEnabled: true,
+      config: {},
+      setMemoryEnabled: vi.fn(),
+      buildSystemPrompt: () => "BASE",
+      tools: [],
+    };
+    const prefs = { getThinkingLevel: vi.fn(() => "medium") };
+    const model = { id: "m", provider: "test" };
+    const coordinator = new SessionCoordinator({
+      agentsDir: path.join(tempDir, "agents"),
+      getAgent: () => agent,
+      getActiveAgentId: () => "hana",
+      getModels: () => ({
+        currentModel: model,
+        authStorage: {},
+        modelRegistry: {},
+        resolveThinkingLevel: (level) => level,
+      }),
+      getResourceLoader: () => ({
+        getSystemPrompt: () => "BASE",
+        getAppendSystemPrompt: () => [],
+        getExtensions: () => ({ extensions: [], errors: [] }),
+        getSkills: () => ({ skills: [], diagnostics: [] }),
+        getAgentsFiles: () => ({ agentsFiles: [] }),
+      }),
+      getSkills: () => null,
+      buildTools: () => ({ tools: [], customTools: [] }),
+      emitEvent: vi.fn(),
+      getHomeCwd: () => tempDir,
+      agentIdFromSessionPath: () => "hana",
+      switchAgentOnly: async () => {},
+      getConfig: () => ({}),
+      getPrefs: () => prefs,
+      getAgents: () => new Map(),
+      getActivityStore: () => null,
+      getAgentById: () => agent,
+      listAgents: () => [],
+    });
+
+    sessionManagerCreateMock
+      .mockReturnValueOnce({ getCwd: () => tempDir, getSessionFile: () => firstSessionPath })
+      .mockReturnValueOnce({ getCwd: () => tempDir, getSessionFile: () => secondSessionPath });
+    createAgentSessionMock
+      .mockResolvedValueOnce({
+        session: {
+          sessionManager: { getSessionFile: () => firstSessionPath },
+          subscribe: vi.fn(() => vi.fn()),
+          setActiveToolsByName: vi.fn(),
+          setThinkingLevel: vi.fn(),
+          model,
+        },
+      })
+      .mockResolvedValueOnce({
+        session: {
+          sessionManager: { getSessionFile: () => secondSessionPath },
+          subscribe: vi.fn(() => vi.fn()),
+          setActiveToolsByName: vi.fn(),
+          setThinkingLevel: vi.fn(),
+          model,
+        },
+      });
+
+    await coordinator.createSession(null, tempDir, true, null, { thinkingLevel: "high" });
+    await coordinator.createSession(null, tempDir, true);
+
+    expect(createAgentSessionMock.mock.calls[0][0].thinkingLevel).toBe("high");
+    expect(createAgentSessionMock.mock.calls[1][0].thinkingLevel).toBe("medium");
+    const meta = JSON.parse(fs.readFileSync(path.join(sessionDir, "session-meta.json"), "utf-8"));
+    expect(meta["first.jsonl"].thinkingLevel).toBe("high");
+    expect(meta["second.jsonl"].thinkingLevel).toBe("medium");
+  });
+
   it("persists authorized folders without adding them to the session prompt snapshot", async () => {
     const agentDir = path.join(tempDir, "hana");
     const sessionDir = path.join(agentDir, "sessions");

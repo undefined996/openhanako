@@ -21,6 +21,7 @@ const initialStateFactory = (): MockState => ({
   pendingSessionSwitchPath: null,
   pendingNewSession: false,
   pendingProjectId: null,
+  pendingNewSessionThinkingLevel: null,
   sessions: [] as Array<{ path: string }>,
   chatSessions: {} as Record<string, unknown>,
   sessionRegistryFilesByPath: {} as Record<string, unknown>,
@@ -64,6 +65,7 @@ const initialStateFactory = (): MockState => ({
   workspaceFolders: [] as string[],
   cwdHistory: [] as string[],
   selectedAgentId: null,
+  thinkingLevel: 'medium',
 });
 
 const dispatchedEvents: CustomEvent[] = [];
@@ -202,6 +204,8 @@ function installStoreMethods() {
   s.clearQuotedSelection = vi.fn();
   s.setActivePanel = vi.fn((v: unknown) => { mockState.activePanel = v; });
   s.requestInputFocus = vi.fn();
+  s.setThinkingLevel = vi.fn((level: string) => { mockState.thinkingLevel = level; });
+  s.setPendingNewSessionThinkingLevel = vi.fn((level: string | null) => { mockState.pendingNewSessionThinkingLevel = level; });
   s.setDeskBasePath = vi.fn((path: string) => { mockState.deskBasePath = path; });
   s.setDeskCurrentPath = vi.fn((path: string) => { mockState.deskCurrentPath = path; });
   s.setDeskFiles = vi.fn((files: unknown[]) => { mockState.deskFiles = files; });
@@ -471,6 +475,25 @@ function jsonResponse(body: unknown, ok = true): Response {
       expect(permissionEvent?.detail).toEqual({ enabled: true, mode: 'read_only' });
     });
 
+    it('initializes pending new-session thinking from the server default', async () => {
+      (mockState as Record<string, unknown>).thinkingLevel = 'high';
+      mockFetch.mockImplementation(async (url: string) => {
+        if (url === '/api/session-permission-mode') {
+          return jsonResponse({ mode: 'ask', defaultMode: 'ask' });
+        }
+        if (url === '/api/session-thinking-level') {
+          return jsonResponse({ thinkingLevel: 'medium' });
+        }
+        throw new Error(`unexpected fetch: ${url}`);
+      });
+
+      await createNewSession();
+
+      expect(mockFetch).toHaveBeenCalledWith('/api/session-thinking-level');
+      expect(mockState.thinkingLevel).toBe('medium');
+      expect(mockState.pendingNewSessionThinkingLevel).toBe('medium');
+    });
+
     it('does not restore focus when a stale new-session continuation is no longer pending', async () => {
       let resolveDesk!: () => void;
       deskActionMocks.activateWorkspaceDesk.mockImplementationOnce(() => new Promise<void>((resolve) => {
@@ -524,6 +547,40 @@ function jsonResponse(body: unknown, ok = true): Response {
         }),
       );
       expect(mockState.workspaceFolders).toEqual(['/reference-a']);
+    });
+
+    it('carries the pending new-session thinking draft into session creation', async () => {
+      Object.assign(mockState, {
+        pendingNewSession: true,
+        memoryEnabled: true,
+        selectedFolder: '/workspace-a',
+        pendingNewSessionThinkingLevel: 'high',
+      });
+      mockFetch.mockResolvedValueOnce(jsonResponse({
+        ok: true,
+        path: '/session/new.jsonl',
+        cwd: '/workspace-a',
+        workspaceFolders: [],
+        thinkingLevel: 'high',
+      }));
+      mockFetch.mockResolvedValueOnce(jsonResponse([]));
+
+      await expect(ensureSession()).resolves.toBe(true);
+
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        1,
+        '/api/sessions/new',
+        expect.objectContaining({
+          body: JSON.stringify({
+            memoryEnabled: true,
+            cwd: '/workspace-a',
+            thinkingLevel: 'high',
+            currentSessionPath: null,
+          }),
+        }),
+      );
+      expect(mockState.pendingNewSessionThinkingLevel).toBeNull();
+      expect(mockState.thinkingLevel).toBe('high');
     });
 
     it('carries an explicit project id from the new-session draft into session creation', async () => {

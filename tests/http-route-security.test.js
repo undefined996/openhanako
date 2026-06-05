@@ -238,6 +238,7 @@ describe("HTTP route security policy", () => {
       ["POST", "/api/models/switch"],
       ["GET", "/api/session-permission-mode"],
       ["POST", "/api/session-permission-mode"],
+      ["GET", "/api/session-thinking-level"],
       ["POST", "/api/session-thinking-level"],
       ["POST", "/api/confirm/confirm_1"],
       ["GET", "/api/browser/session-states"],

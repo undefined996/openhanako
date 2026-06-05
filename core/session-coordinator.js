@@ -586,6 +586,7 @@ export class SessionCoordinator {
     workspaceFolders = [],
     authorizedFolders = [],
     visibleInSessionList = false,
+    thinkingLevel = null,
   } = {}) {
     const t0 = Date.now();
     const agent = explicitAgent
@@ -634,7 +635,9 @@ export class SessionCoordinator {
       : null;
     const promptPatchModel = restoredPromptSnapshot ? null : (effectiveModel || restoredPromptModel);
     const requestedThinkingLevel = normalizeSessionThinkingLevel(
-      restore ? (restoredThinkingLevel || this._d.getPrefs().getThinkingLevel()) : this._d.getPrefs().getThinkingLevel(),
+      restore
+        ? (restoredThinkingLevel || this._d.getPrefs().getThinkingLevel())
+        : (thinkingLevel ?? this._d.getPrefs().getThinkingLevel()),
     );
     let initialThinkingLevel = normalizeThinkingLevelForModel(requestedThinkingLevel, promptPatchModel);
     let resolvedThinkingLevel = models.resolveThinkingLevel(initialThinkingLevel);
@@ -1121,6 +1124,7 @@ export class SessionCoordinator {
     authorizedFolders = [],
     visibleInSessionList = true,
     permissionMode = null,
+    thinkingLevel = null,
   } = {}) {
     const prevFocus = this._session;
     const prevCurrentSessionPath = this._currentSessionPath;
@@ -1139,6 +1143,7 @@ export class SessionCoordinator {
         workspaceFolders,
         authorizedFolders,
         visibleInSessionList,
+        thinkingLevel,
       });
     } finally {
       this._session = prevFocus;
@@ -2037,7 +2042,7 @@ export class SessionCoordinator {
     return normalizeSessionThinkingLevel(entry?.thinkingLevel || fallback);
   }
 
-  setSessionThinkingLevel(sessionPath, level) {
+  async setSessionThinkingLevel(sessionPath, level) {
     if (!sessionPath) {
       return { ok: false, error: "session thinking level requires sessionPath" };
     }
@@ -2047,7 +2052,8 @@ export class SessionCoordinator {
       if (meta) {
         const nextLevel = normalizeSessionThinkingLevel(level);
         meta.thinkingLevel = nextLevel;
-        this.writeSessionMeta(sessionPath, { thinkingLevel: nextLevel });
+        await this.writeSessionMeta(sessionPath, { thinkingLevel: nextLevel });
+        this._emitSessionMetadataUpdated(sessionPath, { thinkingLevel: nextLevel });
         return { ok: true, thinkingLevel: nextLevel };
       }
       return { ok: false, error: "session not found", thinkingLevel: this.getSessionThinkingLevel(sessionPath) };
@@ -2056,7 +2062,8 @@ export class SessionCoordinator {
     const nextLevel = normalizeThinkingLevelForModel(level, entry.session.model);
     entry.thinkingLevel = nextLevel;
     entry.session.setThinkingLevel?.(models.resolveThinkingLevel(nextLevel));
-    this.writeSessionMeta(sessionPath, { thinkingLevel: nextLevel });
+    await this.writeSessionMeta(sessionPath, { thinkingLevel: nextLevel });
+    this._emitSessionMetadataUpdated(sessionPath, { thinkingLevel: nextLevel });
     return { ok: true, thinkingLevel: nextLevel };
   }
 
@@ -2183,6 +2190,14 @@ export class SessionCoordinator {
         ? "先问"
         : (normalized === SESSION_PERMISSION_MODES.AUTO ? "自动审核" : "操作"));
     this._d.emitDevLog(`Permission Mode: ${label}`, "info");
+  }
+
+  _emitSessionMetadataUpdated(sessionPath, metadata) {
+    if (!sessionPath || !metadata || typeof metadata !== "object") return;
+    this._d.emitEvent({
+      type: "session_metadata_updated",
+      metadata: { ...metadata },
+    }, sessionPath);
   }
 
   /**
@@ -2828,6 +2843,7 @@ export class SessionCoordinator {
     const pinnedAt = pinned ? new Date().toISOString() : null;
     await this.writeSessionMeta(sessionPath, { pinnedAt });
     await this._verifySessionPinnedState(sessionPath, pinnedAt);
+    this._emitSessionMetadataUpdated(sessionPath, { pinnedAt });
     return pinnedAt;
   }
 

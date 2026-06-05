@@ -617,6 +617,34 @@ export function handleServerMessage(msg: any): void {
       break;
     }
 
+    case 'session_metadata_updated': {
+      const sp = msg.sessionPath;
+      const metadata = msg.metadata && typeof msg.metadata === 'object' ? msg.metadata : {};
+      if (!sp) { console.warn('[ws] event missing sessionPath:', msg.type); break; }
+      const hasPinnedAt = Object.prototype.hasOwnProperty.call(metadata, 'pinnedAt');
+      const hasProjectId = Object.prototype.hasOwnProperty.call(metadata, 'projectId');
+      if (hasPinnedAt || hasProjectId) {
+        useStore.setState((s) => ({
+          sessions: s.sessions.map((session) => {
+            if (session.path !== sp) return session;
+            return {
+              ...session,
+              ...(hasPinnedAt
+                ? { pinnedAt: typeof metadata.pinnedAt === 'string' ? metadata.pinnedAt : null }
+                : {}),
+              ...(hasProjectId
+                ? { projectId: typeof metadata.projectId === 'string' && metadata.projectId.trim() ? metadata.projectId.trim() : null }
+                : {}),
+            };
+          }),
+        }));
+      }
+      if (sp === useStore.getState().currentSessionPath && typeof metadata.thinkingLevel === 'string') {
+        useStore.getState().setThinkingLevel(metadata.thinkingLevel);
+      }
+      break;
+    }
+
     case 'plan_mode': {
       const sp = msg.sessionPath;
       if (!sp || sp === useStore.getState().currentSessionPath) {
