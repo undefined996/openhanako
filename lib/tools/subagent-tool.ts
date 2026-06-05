@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * subagent-tool.js — Sub-agent 工具（非阻塞）
  *
@@ -31,7 +30,7 @@ function directPersistDir(deps) {
   return path.join(deps.agentDir, "subagent-sessions", "direct");
 }
 
-function pickLabel(params = {}) {
+function pickLabel(params: Record<string, any> = {}) {
   if (typeof params.label === "string" && params.label.trim()) return params.label.trim();
   // Legacy compatibility: old callers may still pass instance. It is now display-only.
   if (typeof params.instance === "string" && params.instance.trim()) return params.instance.trim();
@@ -191,13 +190,16 @@ export function createSubagentTool(deps) {
     return sum;
   }
 
+  const baseDescription =
+    "Create a continuable subagent instance for a delegated task. Returns immediately with taskId and threadId; results are delivered back in the background. Use agent to target an agent, or agent=\"?\" to list agents.";
+  const delegationDescription = !deps.proactiveDelegation ? "" :
+    "\n\nIf the target is already known, use the direct tool: read for a known path, grep or find for a specific symbol or file. For broad exploration or research that would take more than 3 queries, delegate to a subagent with access=\"read\". Otherwise use read/grep/find directly." +
+    "\n\nSubagents are valuable for parallelizing independent queries or for protecting the main context window from excessive results, but should not be used excessively when simpler tools suffice.";
+
   return {
     name: "subagent",
     label: "Launch Subagent",
-    description:
-      "Create a continuable subagent instance for a delegated task. Returns immediately with taskId and threadId; results are delivered back in the background. Use agent to target an agent, or agent=\"?\" to list agents.\n\n" +
-      "If the target is already known, use the direct tool: read for a known path, grep or find for a specific symbol or file. For broad exploration or research that would take more than 3 queries, delegate to a subagent with access=\"read\". Otherwise use read/grep/find directly.\n\n" +
-      "Subagents are valuable for parallelizing independent queries or for protecting the main context window from excessive results, but should not be used excessively when simpler tools suffice.",
+    description: baseDescription + delegationDescription,
     parameters: Type.Object({
       task: Type.String({ description: "Complete instructions and required context for the subagent. The subagent cannot see the current conversation history unless you include it here." }),
       model: Type.Optional(Type.String({ description: "Optional model override as provider/id. Omit to use the target agent's configured chat model." })),
@@ -721,7 +723,7 @@ export function createSubagentReplyTool(deps) {
       const runPromise = threadStore.runSerialized(threadId, executeExistingThread);
       runPromise.then(result => {
         const wasUserAborted = registry?.query(taskId)?.aborted;
-        const outcome = wasUserAborted
+        const outcome: any = wasUserAborted
           ? { ok: false, reason: t("error.subagentAborted"), aborted: true }
           : normalizeSubagentOutcome(result);
         if (outcome.aborted) {

@@ -10,6 +10,7 @@ import {
 
 export const CACHE_SNAPSHOT_EXPERIMENT_ID = "memory.cache_snapshot_reflection";
 export const DEEPSEEK_ROLEPLAY_REASONING_PATCH_EXPERIMENT_ID = "provider.deepseek_roleplay_reasoning_patch";
+export const PROACTIVE_SUBAGENT_EXPERIMENT_ID = "subagent.proactive_delegation";
 export { COMPACTION_MODE_EXPERIMENT_ID };
 
 const DEFINITIONS = [
@@ -119,6 +120,36 @@ const DEFINITIONS = [
     sunsetPolicy: {
       removeWhenRetired: true,
       migration: "Read old experiment value for one release after moving to Agent / Memory.",
+    },
+  }),
+  normalizeExperimentDefinition({
+    id: PROACTIVE_SUBAGENT_EXPERIMENT_ID,
+    titleKey: "settings.experiments.proactiveSubagent.title",
+    descriptionKey: "settings.experiments.proactiveSubagent.description",
+    owner: "session",
+    scope: "global",
+    defaultValue: false,
+    valueSchema: {
+      type: "boolean",
+      presentation: {
+        type: "toggle",
+      },
+    },
+    status: "beta",
+    risk: "low",
+    restartPolicy: "new_session",
+    targetHome: {
+      tab: "agent",
+      section: "subagent",
+      whenStable: "Promote to Agent / Subagent settings if delegation quality improves measurably.",
+    },
+    exitCriteria: [
+      "Subagent delegation reduces main context token usage without degrading task accuracy.",
+      "3-query threshold feels natural across coding, research, and conversational tasks.",
+    ],
+    sunsetPolicy: {
+      removeWhenRetired: true,
+      migration: "Drop the experiment value once promoted or retired.",
     },
   }),
 ];

@@ -2,13 +2,15 @@ import { describe, it, expect, vi } from "vitest";
 
 vi.mock("../lib/i18n.ts", () => ({ t: (k: string) => k, getLocale: () => "en" }));
 
-async function loadSubagentToolDef() {
+const baseDeps = {
+  currentAgentId: "test",
+  getParentCwd: () => "/tmp",
+  executeIsolated: async () => {},
+};
+
+async function loadSubagentToolDef(extraDeps = {}) {
   const mod = await import("../lib/tools/subagent-tool.ts");
-  const tool = (mod as any).createSubagentTool({
-    currentAgentId: "test",
-    getParentCwd: () => "/tmp",
-    executeIsolated: async () => {},
-  });
+  const tool = (mod as any).createSubagentTool({ ...baseDeps, ...extraDeps });
   return tool;
 }
 
@@ -20,8 +22,15 @@ describe("subagent tool schema", () => {
     expect(tool.description).not.toContain("<hana-background-result>");
   });
 
-  it("includes context protection guidance", async () => {
+  it("excludes delegation guidance by default (experiment off)", async () => {
     const tool = await loadSubagentToolDef();
+    expect(tool.description).not.toContain("direct tool");
+    expect(tool.description).not.toContain("protecting the main context window");
+    expect(tool.description).toContain("continuable subagent instance");
+  });
+
+  it("includes delegation guidance when proactiveDelegation is on", async () => {
+    const tool = await loadSubagentToolDef({ proactiveDelegation: true });
     expect(tool.description).toContain("direct tool");
     expect(tool.description).toContain("protecting the main context window");
   });

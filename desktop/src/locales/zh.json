@@ -923,7 +923,13 @@
       "deepseekRoleplay": {
         "title": "DeepSeek 人格沉浸补丁",
         "description": "打开后，新建 DeepSeek V4 思考会话会在出站请求的第一条用户消息末尾临时追加人格沉浸 marker；它不会显示、保存或恢复到聊天历史。关闭时保持旧行为。"
-      }
+      },
+      "proactiveSubagent": {
+        "title": "更积极地调用 subagent",
+        "description": "节省主聊天的上下文注意力资源，可能有更好的工作结果。开启后，agent 会主动把范围较广的探索和调研任务委派给 subagent。"
+      },
+      "subagentTitle": "Subagent",
+      "subagentSectionDescription": "控制 agent 何时将工作委派给 subagent。"
     },
     "appearance": {
       "title": "外观",

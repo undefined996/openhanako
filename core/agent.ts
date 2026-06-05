@@ -53,6 +53,7 @@ import {
 import { createModuleLogger } from "../lib/debug-log.ts";
 import {
   CACHE_SNAPSHOT_EXPERIMENT_ID,
+  PROACTIVE_SUBAGENT_EXPERIMENT_ID,
   getResolvedExperimentValue,
 } from "../lib/experiments/registry.ts";
 
@@ -537,6 +538,10 @@ export class Agent {
       agentDir: this.agentDir,
       emitEvent: (event, sp) => this._cb?.emitEvent?.(event, sp),
       persistSubagentSessionMeta: (sessionPath, meta) => writeSubagentSessionMeta(sessionPath, meta),
+      proactiveDelegation: getResolvedExperimentValue(
+        this._cb?.getPreferences?.(),
+        PROACTIVE_SUBAGENT_EXPERIMENT_ID,
+      ),
     };
     this._subagentTool = createSubagentTool(subagentToolDeps);
     this._subagentReplyTool = createSubagentReplyTool(subagentToolDeps);
@@ -1140,15 +1145,23 @@ export class Agent {
     );
 
     if (!forSubagent) {
+      const proactiveDelegation = getResolvedExperimentValue(
+        this._cb?.getPreferences?.(),
+        PROACTIVE_SUBAGENT_EXPERIMENT_ID,
+      );
+      const delegationZh = !proactiveDelegation ? "" :
+        "已知目标用直接工具（read/grep/find/shell），不要为简单任务创建子实例。范围较广的探索或调研（预计超过 3 次查询），委派给 subagent（access=\"read\"）；否则直接用 read/grep/find。subagent 的价值在于并行处理独立查询、保护主上下文窗口免受过量结果侵入。\n\n";
+      const delegationEn = !proactiveDelegation ? "" :
+        "If the target is already known, use direct tools (read/grep/find/shell); do not create a subagent instance for simple tasks. For broad exploration or research that would take more than 3 queries, delegate to a subagent with access=\"read\". Subagents are valuable for parallelizing independent queries or for protecting the main context window from excessive results.\n\n";
       parts.push(isZh
         ? "\n## subagent 协作\n\n" +
-          "已知目标用直接工具（read/grep/find/shell），不要为简单任务创建子实例。范围较广的探索或调研（预计超过 3 次查询），委派给 subagent（access=\"read\"）；否则直接用 read/grep/find。subagent 的价值在于并行处理独立查询、保护主上下文窗口免受过量结果侵入。\n\n" +
+          delegationZh +
           "subagent 会创建一个可继续的 subagent 实例，并返回 threadId。label 只用于展示，access 只决定只读或可操作权限；二者都不作为续接身份。\n\n" +
           "当任务可能已经有合适的 subagent 实例时，先调用 current_status 获取 subagents，查看当前会话打开的 threadId、agent、label、权限和最近状态。\n\n" +
           "继续同一个实例用 subagent_reply(threadId, task)。新方向或缺少合适实例时才用 subagent 创建新的实例。一个实例忙时会排队执行，不要用 label 猜测身份。\n\n" +
           "如果实例不再有用，或需要腾出位置，调用 subagent_close(threadId) 关闭。没有可用位置时，由你根据任务相关性和最近状态决定关闭哪个实例。workflow 里的 agent() 是一次性节点，不参与这里的可继续实例池。"
         : "\n## Subagent Collaboration\n\n" +
-          "If the target is already known, use direct tools (read/grep/find/shell); do not create a subagent instance for simple tasks. For broad exploration or research that would take more than 3 queries, delegate to a subagent with access=\"read\". Subagents are valuable for parallelizing independent queries or for protecting the main context window from excessive results.\n\n" +
+          delegationEn +
           "subagent creates a continuable sub-agent instance and returns a threadId. label is display-only, and access only chooses read-only or writable permissions; neither is the resume identity.\n\n" +
           "When the task may already have a suitable sub-agent instance, call current_status with the subagents key first. It shows the open threadId, agent, label, access, and recent status for this session.\n\n" +
           "Continue the same instance with subagent_reply(threadId, task). Create a new instance with subagent only for a new direction or when no suitable instance exists. If an instance is busy, replies queue; do not infer identity from label.\n\n" +

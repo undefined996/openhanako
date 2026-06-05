@@ -923,7 +923,13 @@
       "deepseekRoleplay": {
         "title": "DeepSeek persona immersion patch",
         "description": "When enabled, new DeepSeek V4 thinking sessions temporarily append a persona-immersion marker to the first outbound user message. It is not displayed, saved, or restored in chat history. Turning it off keeps the old behavior."
-      }
+      },
+      "proactiveSubagent": {
+        "title": "Proactive subagent delegation",
+        "description": "When enabled, the agent proactively delegates broad exploration and research tasks to subagents, conserving the main chat's context attention. May yield better results for complex tasks."
+      },
+      "subagentTitle": "Subagent",
+      "subagentSectionDescription": "Control how the agent decides when to delegate work to subagents."
     },
     "appearance": {
       "title": "Appearance",
