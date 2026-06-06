@@ -3,6 +3,10 @@ import { hanaFetch, hanaUrl } from '../api';
 import { t } from '../helpers';
 import { useSettingsStore } from '../store';
 import {
+  DESKTOP_REMOTE_ACCESS_SCOPES,
+  MOBILE_REMOTE_ACCESS_SCOPES,
+} from '../../../../../shared/access-scope-profiles.ts';
+import {
   LOCAL_CONNECTION_ID,
   connectDeviceServerConnection,
   isLocalOwnerConnection,
@@ -62,7 +66,8 @@ interface AccessSummary {
   }>;
 }
 
-const DEFAULT_SCOPES = ['chat', 'resources.read', 'files.read', 'files.write'];
+const MOBILE_ACCESS_SCOPES = [...MOBILE_REMOTE_ACCESS_SCOPES];
+const DESKTOP_ACCESS_SCOPES = [...DESKTOP_REMOTE_ACCESS_SCOPES];
 
 export function AccessTab() {
   const showToast = useSettingsStore(s => s.showToast);
@@ -217,7 +222,7 @@ export function AccessTab() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           displayName: 'Mobile PWA',
-          scopes: DEFAULT_SCOPES,
+          scopes: MOBILE_ACCESS_SCOPES,
         }),
       });
       const data = await res.json();
@@ -239,7 +244,7 @@ export function AccessTab() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           displayName: 'Desktop Frontend',
-          scopes: DEFAULT_SCOPES,
+          scopes: DESKTOP_ACCESS_SCOPES,
         }),
       });
       const data = await res.json();

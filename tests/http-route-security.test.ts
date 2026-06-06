@@ -16,6 +16,31 @@ function devicePrincipal(scopes = []) {
   });
 }
 
+const mobileScopes = Object.freeze(["chat", "resources.read", "files.read", "files.write"]);
+const legacyDesktopOwnerScopes = Object.freeze([
+  "chat",
+  "resources.read",
+  "files.read",
+  "files.write",
+  "settings.read",
+  "settings.write",
+  "providers.manage",
+  "secrets.write",
+  "bridge.manage",
+]);
+const desktopOwnerScopes = Object.freeze([
+  ...legacyDesktopOwnerScopes,
+  "studio.owner",
+]);
+
+function mobilePrincipal() {
+  return devicePrincipal([...mobileScopes]);
+}
+
+function desktopOwnerPrincipal(extraScopes = []) {
+  return devicePrincipal([...desktopOwnerScopes, ...extraScopes]);
+}
+
 describe("HTTP route security policy", () => {
   it("keeps local owner access unrestricted", async () => {
     const { authorizeHttpRoute } = await import("../server/http/route-security.ts");
@@ -51,7 +76,6 @@ describe("HTTP route security policy", () => {
     for (const [method, path] of [
       ["POST", "/api/shutdown"],
       ["GET", "/internal/browser"],
-      ["GET", "/api/usage/llm"],
     ]) {
       expect(authorizeHttpRoute({ method, path, principal })).toMatchObject({
         allowed: false,
@@ -59,6 +83,12 @@ describe("HTTP route security policy", () => {
         error: "local_only_route",
       });
     }
+    expect(authorizeHttpRoute({ method: "GET", path: "/api/usage/llm", principal }))
+      .toMatchObject({
+        allowed: false,
+        status: 403,
+        error: "studio_owner_required",
+      });
   });
 
   it("keeps access and device management routes local-owner only", async () => {
@@ -185,9 +215,10 @@ describe("HTTP route security policy", () => {
       .toMatchObject({ allowed: false, error: "insufficient_scope", requiredScope: "files.write" });
   });
 
-  it("allows remote plugin UI metadata, settings tabs, and iframe ticket issuance without opening plugin route apps", async () => {
+  it("allows remote plugin UI metadata, settings tabs, and iframe ticket issuance while keeping plugin route apps owner-gated", async () => {
     const { authorizeHttpRoute } = await import("../server/http/route-security.ts");
     const principal = devicePrincipal(["chat", "settings.read"]);
+    const owner = desktopOwnerPrincipal();
 
     for (const [method, path] of [
       ["GET", "/api/plugins/pages"],
@@ -208,9 +239,11 @@ describe("HTTP route security policy", () => {
       .toMatchObject({
         allowed: false,
         status: 403,
-        error: "local_only_route",
+        error: "studio_owner_required",
       });
-    expect(authorizeHttpRoute({ method: "POST", path: "/api/plugins/demo/assets/dist/app.js", principal }))
+    expect(authorizeHttpRoute({ method: "GET", path: "/api/plugins/demo/page", principal: owner }))
+      .toMatchObject({ allowed: true });
+    expect(authorizeHttpRoute({ method: "POST", path: "/api/plugins/demo/assets/dist/app.js", principal: owner }))
       .toMatchObject({
         allowed: false,
         status: 403,
@@ -220,13 +253,15 @@ describe("HTTP route security policy", () => {
       .toMatchObject({
         allowed: false,
         status: 403,
-        error: "local_only_route",
+        error: "insufficient_scope",
       });
+    expect(authorizeHttpRoute({ method: "PUT", path: "/api/plugins/demo/config", principal: owner }))
+      .toMatchObject({ allowed: true });
     expect(authorizeHttpRoute({ method: "PUT", path: "/api/plugins/settings", principal }))
       .toMatchObject({
         allowed: false,
         status: 403,
-        error: "local_only_route",
+        error: "insufficient_scope",
       });
   });
 
@@ -262,6 +297,115 @@ describe("HTTP route security policy", () => {
         .toMatchObject({ allowed: true });
       expect(authorizeHttpRoute({ method, path, principal: reader }))
         .toMatchObject({ allowed: false, error: "insufficient_scope" });
+    }
+  });
+
+  it("allows desktop owner clients to consume Studio server settings, plugins, skills, image generation, and connector routes", async () => {
+    const { authorizeHttpRoute } = await import("../server/http/route-security.ts");
+    const owner = desktopOwnerPrincipal();
+
+    for (const [method, path] of [
+      ["GET", "/api/agents"],
+      ["GET", "/api/agents/hana/identity"],
+      ["GET", "/api/agents/hana/ishiki"],
+      ["GET", "/api/agents/hana/public-ishiki"],
+      ["GET", "/api/agents/hana/pinned"],
+      ["GET", "/api/agents/hana/experience"],
+      ["GET", "/api/user-profile"],
+      ["GET", "/api/preferences/notifications"],
+      ["GET", "/api/preferences/computer-use"],
+      ["GET", "/api/skills?agentId=hana"],
+      ["GET", "/api/skills/bundles?agentId=hana"],
+      ["PATCH", "/api/agents/hana/skills/imagegen"],
+      ["PATCH", "/api/agents/hana/skill-bundles/story-pack"],
+      ["PUT", "/api/agents/hana/skills"],
+      ["POST", "/api/skills/bundles"],
+      ["PUT", "/api/skills/bundles/order"],
+      ["PUT", "/api/skills/bundles/story-pack"],
+      ["DELETE", "/api/skills/bundles/story-pack"],
+      ["POST", "/api/skills/bundles/story-pack/export"],
+      ["GET", "/api/plugins?source=community"],
+      ["GET", "/api/plugins/marketplace"],
+      ["GET", "/api/plugins/marketplace/image-gen/readme"],
+      ["GET", "/api/plugins/diagnostics"],
+      ["GET", "/api/plugins/image-gen/providers"],
+      ["PUT", "/api/plugins/image-gen/config"],
+      ["POST", "/api/plugins/image-gen/providers/dashscope/models"],
+      ["DELETE", "/api/plugins/image-gen/providers/dashscope/models/wanx"],
+      ["POST", "/api/plugins/image-gen/tasks/task_1/retry"],
+      ["GET", "/api/plugins/image-gen/media/cover.png"],
+      ["HEAD", "/api/plugins/image-gen/media/cover.png"],
+      ["GET", "/api/plugins/image-gen/tasks/batch/batch_1"],
+      ["GET", "/api/plugins/image-gen/tasks/task_1"],
+      ["GET", "/api/plugins/config-schemas"],
+      ["GET", "/api/plugins/image-gen/config-schema"],
+      ["GET", "/api/plugins/image-gen/config"],
+      ["PUT", "/api/plugins/image-gen/enabled"],
+      ["DELETE", "/api/plugins/image-gen"],
+      ["POST", "/api/plugins/marketplace/image-gen/install"],
+      ["GET", "/api/plugins/mcp/state?agentId=hana"],
+      ["PUT", "/api/plugins/mcp/enabled"],
+      ["POST", "/api/plugins/mcp/servers"],
+      ["PUT", "/api/plugins/mcp/servers/github"],
+      ["DELETE", "/api/plugins/mcp/servers/github"],
+      ["POST", "/api/plugins/mcp/servers/github/start"],
+      ["POST", "/api/plugins/mcp/servers/github/stop"],
+      ["POST", "/api/plugins/mcp/servers/github/refresh-tools"],
+      ["PUT", "/api/plugins/mcp/agents/hana/servers/github"],
+    ]) {
+      expect(authorizeHttpRoute({ method, path, principal: owner }), `${method} ${path}`)
+        .toMatchObject({ allowed: true });
+    }
+  });
+
+  it("keeps mobile clients scoped away from Studio-owner settings and plugin management", async () => {
+    const { authorizeHttpRoute } = await import("../server/http/route-security.ts");
+    const principal = mobilePrincipal();
+
+    for (const [method, path] of [
+      ["GET", "/api/agents"],
+      ["GET", "/api/skills?agentId=hana"],
+      ["PATCH", "/api/agents/hana/skills/imagegen"],
+      ["GET", "/api/plugins?source=community"],
+      ["GET", "/api/plugins/marketplace"],
+      ["GET", "/api/plugins/diagnostics"],
+      ["GET", "/api/plugins/image-gen/providers"],
+      ["PUT", "/api/plugins/image-gen/config"],
+      ["GET", "/api/plugins/mcp/state?agentId=hana"],
+      ["PUT", "/api/plugins/mcp/enabled"],
+    ]) {
+      expect(authorizeHttpRoute({ method, path, principal }), `${method} ${path}`)
+        .toMatchObject({ allowed: false, status: 403 });
+    }
+  });
+
+  it("keeps explicitly client-local server actions unavailable to remote desktop owners", async () => {
+    const { authorizeHttpRoute } = await import("../server/http/route-security.ts");
+    const owner = desktopOwnerPrincipal();
+
+    for (const [method, path] of [
+      ["GET", "/api/access/summary"],
+      ["PUT", "/api/access/network"],
+      ["POST", "/api/access/mobile-credentials"],
+      ["POST", "/api/access/desktop-credentials"],
+      ["PUT", "/api/access/account/profile"],
+      ["PUT", "/api/access/account/password"],
+      ["DELETE", "/api/access/account/password"],
+      ["POST", "/api/devices/device_1/revoke"],
+      ["POST", "/api/devices/credentials/cred_1/revoke"],
+      ["POST", "/api/preferences/computer-use/request-permissions"],
+      ["GET", "/api/skills/external-paths"],
+      ["PUT", "/api/skills/external-paths"],
+      ["POST", "/api/plugins/dev/install"],
+      ["POST", "/api/plugins/dev/demo/reload"],
+      ["POST", "/api/plugins/image-gen/media/open/cover.png"],
+    ]) {
+      expect(authorizeHttpRoute({ method, path, principal: owner }), `${method} ${path}`)
+        .toMatchObject({
+          allowed: false,
+          status: 403,
+          error: "local_only_route",
+        });
     }
   });
 
@@ -438,17 +582,24 @@ describe("HTTP route security policy", () => {
     })).toMatchObject({ allowed: true });
   });
 
-  it("defaults unknown API routes to local-only until they are explicitly classified", async () => {
+  it("defaults unknown server API routes to Studio owner instead of hiding them from remote desktop clients", async () => {
     const { authorizeHttpRoute } = await import("../server/http/route-security.ts");
 
     expect(authorizeHttpRoute({
       method: "GET",
       path: "/api/new-surface",
-      principal: devicePrincipal(["chat", "resources.read", "admin"]),
+      principal: desktopOwnerPrincipal(),
+    })).toMatchObject({
+      allowed: true,
+    });
+    expect(authorizeHttpRoute({
+      method: "GET",
+      path: "/api/new-surface",
+      principal: mobilePrincipal(),
     })).toMatchObject({
       allowed: false,
       status: 403,
-      error: "local_only_route",
+      error: "studio_owner_required",
     });
   });
 });

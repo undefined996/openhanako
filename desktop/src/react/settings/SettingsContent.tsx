@@ -63,18 +63,17 @@ const TAB_COMPONENTS: Record<string, React.ComponentType> = {
 
 function connectionState(connection: ServerConnection | null) {
   const persisted = readPersistedServerConnectionState();
-  if (!connection) {
-    return {
-      serverConnections: persisted.serverConnections,
-      activeServerConnectionId: null,
-      activeServerConnection: null,
-    };
-  }
-  const serverConnections = upsertServerConnection(persisted.serverConnections, connection);
+  const serverConnections = connection
+    ? upsertServerConnection(persisted.serverConnections, connection)
+    : persisted.serverConnections;
+  const persistedActive = persisted.activeServerConnectionId
+    ? serverConnections[persisted.activeServerConnectionId] || null
+    : null;
+  const activeServerConnection = persistedActive || connection || null;
   return {
     serverConnections,
-    activeServerConnectionId: connection.connectionId,
-    activeServerConnection: connection,
+    activeServerConnectionId: activeServerConnection?.connectionId ?? null,
+    activeServerConnection,
   };
 }
 
@@ -306,11 +305,18 @@ async function initSettings() {
   }, 15_000);
 
   try {
-    const serverPort = Number(await platform.getServerPort());
-    const serverToken = await platform.getServerToken();
+    const rawServerPort = typeof platform?.getServerPort === 'function'
+      ? await platform.getServerPort()
+      : null;
+    const serverPort = rawServerPort === null || rawServerPort === undefined
+      ? null
+      : Number(rawServerPort);
+    const serverToken = typeof platform?.getServerToken === 'function'
+      ? await platform.getServerToken()
+      : null;
     let platformName: string | null = null;
     try {
-      platformName = typeof platform.getPlatform === 'function' ? await platform.getPlatform() : null;
+      platformName = typeof platform?.getPlatform === 'function' ? await platform.getPlatform() : null;
     } catch {
       platformName = null;
     }

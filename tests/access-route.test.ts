@@ -283,6 +283,7 @@ describe("access route", () => {
           "resources.read",
           "files.read",
           "files.write",
+          "studio.owner",
           "settings.read",
           "settings.write",
           "providers.manage",

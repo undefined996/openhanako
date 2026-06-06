@@ -100,6 +100,65 @@ describe("scan", () => {
 });
 
 describe("loadAll", () => {
+  it("loads real bundled image-gen, beautify, and mcp plugin contributions", async () => {
+    const pm = new PluginManager({
+      pluginsDirs: [path.resolve("plugins")],
+      dataDir,
+      bus: await makeBus(),
+      runtimeContext: {
+        serverId: "server_builtin_smoke",
+        serverNodeId: "node_builtin_smoke",
+        userId: "user_builtin_smoke",
+        studioId: "studio_builtin_smoke",
+        connectionKind: "local",
+        credentialKind: "loopback_token",
+      },
+    } as any);
+
+    pm.scan();
+    try {
+      await pm.loadAll();
+
+      const diagnosticsById = new Map(pm.getDiagnostics().map((entry) => [entry.id, entry]));
+      for (const id of ["image-gen", "beautify", "mcp"]) {
+        expect(diagnosticsById.get(id)).toMatchObject({
+          id,
+          source: "builtin",
+          hidden: true,
+          status: "loaded",
+          error: null,
+        });
+      }
+
+      const toolNames = pm.getAllTools().map((tool) => tool.name);
+      expect(toolNames).toEqual(expect.arrayContaining([
+        "image-gen_generate-image",
+        "image-gen_generate-video",
+        "beautify_create-cover",
+        "beautify_apply-cover-candidate",
+        "beautify_get-cover-style-guide",
+        "beautify_list-capabilities",
+      ]));
+      expect(pm.getSkillPaths()).toEqual(expect.arrayContaining([
+        expect.objectContaining({ pluginId: "image-gen", builtin: true }),
+      ]));
+      expect(pm.routeRegistry.has("image-gen")).toBe(true);
+      expect(pm.routeRegistry.has("mcp")).toBe(true);
+      expect(pm.getConfigSchema("image-gen")?.properties).toHaveProperty("defaultImageModel");
+      expect(pm.getConfigSchema("beautify")?.properties).toHaveProperty("coverResolution");
+      expect(pm.getSettingsTabs()).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          pluginId: "mcp",
+          nativeComponent: "mcp.settings",
+        }),
+      ]));
+    } finally {
+      for (const id of ["image-gen", "beautify", "mcp"]) {
+        await pm.unloadPlugin(id, { source: "builtin" });
+      }
+    }
+  });
+
   it("loads plugin with index.js and calls onload", async () => {
     const dir = path.join(pluginsDir, "stateful");
     fs.mkdirSync(dir, { recursive: true });

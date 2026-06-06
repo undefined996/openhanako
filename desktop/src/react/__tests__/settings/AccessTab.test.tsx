@@ -383,7 +383,18 @@ describe('AccessTab', () => {
       method: 'POST',
       body: JSON.stringify({
         displayName: 'Desktop Frontend',
-        scopes: ['chat', 'resources.read', 'files.read', 'files.write'],
+        scopes: [
+          'chat',
+          'resources.read',
+          'files.read',
+          'files.write',
+          'studio.owner',
+          'settings.read',
+          'settings.write',
+          'providers.manage',
+          'secrets.write',
+          'bridge.manage',
+        ],
       }),
     }));
   });

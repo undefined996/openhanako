@@ -237,7 +237,7 @@ describe("server identity route", () => {
       serverId: "server_route",
       userId: "user_route",
       studioId: "studio_route",
-      capabilities: ["chat", "resources", "files"],
+      capabilities: ["chat", "resources.read", "resources", "files.read", "files", "files.write"],
     });
   });
 });

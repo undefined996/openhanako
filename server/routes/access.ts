@@ -16,19 +16,10 @@ import { readAuthPrincipal } from "../http/capability-guard.ts";
 import { isLocalOwnerPrincipal } from "../http/route-security.ts";
 import { recordSecurityAuditEvent } from "../http/security-audit.ts";
 import { safeJson } from "../hono-helpers.ts";
-
-const MOBILE_REMOTE_ACCESS_SCOPES = Object.freeze(["chat", "resources.read", "files.read", "files.write"]);
-const DESKTOP_REMOTE_ACCESS_SCOPES = Object.freeze([
-  "chat",
-  "resources.read",
-  "files.read",
-  "files.write",
-  "settings.read",
-  "settings.write",
-  "providers.manage",
-  "secrets.write",
-  "bridge.manage",
-]);
+import {
+  DESKTOP_REMOTE_ACCESS_SCOPES,
+  MOBILE_REMOTE_ACCESS_SCOPES,
+} from "../../shared/access-scope-profiles.ts";
 const ACCESS_PROFILES = Object.freeze({
   mobile: Object.freeze({
     deviceKind: "mobile",

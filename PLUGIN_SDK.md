@@ -23,6 +23,8 @@ The SDK packages are developer-facing source/build dependencies. The app package
 
 Built-in plugins may use the same source patterns, but they should be checked against the packaged server bundle before release. The host does not silently provide these SDK packages as global runtime modules.
 
+Plugin server code is installed and loaded by the Studio server. Plugin iframe assets are also served by that server; the desktop renderer, Mobile PWA, or browser client may cache them, but client locality must not decide whether a plugin surface, provider, task, config, or tool exists. Declare true client-machine-only actions separately from server workspace actions.
+
 ## Plugin Shape Guide
 
 - Tool-only plugins usually need only `tools/*.js` and `@hana/plugin-runtime` helpers. They can stay `restricted`.
