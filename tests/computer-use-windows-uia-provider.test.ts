@@ -127,6 +127,26 @@ describe("Windows UIA provider", () => {
     expect(WINDOWS_UIA_HELPER_SCRIPT).not.toContain("[System.IO.File]::WriteAllText($script:WindowsUiaResultPath, $json");
   });
 
+  it("serializes UIA bounds through a JSON-safe number helper", () => {
+    expect(WINDOWS_UIA_HELPER_SCRIPT).toContain("function Safe-Number($value)");
+    expect(WINDOWS_UIA_HELPER_SCRIPT).toContain("if ([double]::IsNaN($number) -or [double]::IsInfinity($number)) { return $null }");
+    expect(WINDOWS_UIA_HELPER_SCRIPT).toContain("x = Safe-Number $r.Left");
+    expect(WINDOWS_UIA_HELPER_SCRIPT).toContain("y = Safe-Number $r.Top");
+    expect(WINDOWS_UIA_HELPER_SCRIPT).toContain("width = Safe-Number $r.Width");
+    expect(WINDOWS_UIA_HELPER_SCRIPT).toContain("height = Safe-Number $r.Height");
+    expect(WINDOWS_UIA_HELPER_SCRIPT).not.toContain("x = [double]$r.Left");
+  });
+
+  it("rejects unstable snapshot matching when bounds cannot be used safely", () => {
+    expect(WINDOWS_UIA_HELPER_SCRIPT).toContain("function Bounds-AreUsable($bounds)");
+    expect(WINDOWS_UIA_HELPER_SCRIPT).toContain('reason = "bounds-unavailable"');
+
+    const boundsUnavailableIndex = WINDOWS_UIA_HELPER_SCRIPT.indexOf('reason = "bounds-unavailable"');
+    const centerMathIndex = WINDOWS_UIA_HELPER_SCRIPT.indexOf("$expectedCenterX = [double]$snapshot.bounds.x");
+    expect(boundsUnavailableIndex).toBeGreaterThan(0);
+    expect(centerMathIndex).toBeGreaterThan(boundsUnavailableIndex);
+  });
+
   it("reports unavailable on non-Windows platforms", async () => {
     const provider = createWindowsUiaProvider({ platform: "darwin" });
 
