@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useSettingsStore } from '../store';
 import { hanaFetch } from '../api';
 import { t, autoSaveConfig } from '../helpers';
-import { SelectWidget } from '@/ui';
+import { SelectWidget, ProviderGroupHeader, selectWidgetStyles } from '@/ui';
 import { browseAgent, switchToAgent, setPrimaryAgent, loadSettingsConfig, loadAgents } from '../actions';
 import { AgentCardStack } from './agent/AgentCardStack';
 import { YuanSelector } from './agent/YuanSelector';
@@ -285,6 +285,8 @@ export function AgentTab() {
                 await autoSaveConfig({ models: { chat: { id, provider } } });
               }}
               placeholder={t('settings.api.selectModel')}
+              renderGroupHeader={(g) => <ProviderGroupHeader provider={g} />}
+              popupClassName={selectWidgetStyles.providerInset}
             />
           </div>
           <span className={styles['settings-form-hint']}>{t('settings.agent.chatModelHint')}</span>

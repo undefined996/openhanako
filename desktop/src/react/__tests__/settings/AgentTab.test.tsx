@@ -37,6 +37,8 @@ vi.mock('@/ui', () => ({
   SelectWidget: ({ value }: { value?: string }) => (
     <div data-testid="model-select">{value || ''}</div>
   ),
+  ProviderGroupHeader: ({ provider }: { provider: string }) => <div>{provider}</div>,
+  selectWidgetStyles: { providerInset: 'providerInset' },
 }));
 
 vi.mock('../../settings/tabs/agent/AgentCardStack', () => ({

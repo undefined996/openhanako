@@ -127,6 +127,12 @@
   padding: 0.5rem 0.65rem;
 }
 
+/* 分组带 provider 图标时，选项左缩进，使选项文字与分组标题文字对齐（图标凸出在左侧）。
+   缩进量 = 标题 padding-left(0.65) + 图标(0.9) + gap(0.4)，见 ProviderIcon.module.css */
+.providerInset .option {
+  padding-left: 1.95rem;
+}
+
 .optionDesc {
   font-size: 0.68rem;
   color: var(--text-muted);

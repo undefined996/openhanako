@@ -23,6 +23,8 @@ interface SelectWidgetProps {
   popupClassName?: string;
   renderTrigger?: (option: SelectOption | undefined, isOpen: boolean) => React.ReactNode;
   renderOption?: (option: SelectOption, isSelected: boolean) => React.ReactNode;
+  /** Custom group-header renderer; defaults to the built-in label */
+  renderGroupHeader?: (group: string) => React.ReactNode;
   /** 'comfortable' gives 1.2x row height for avatar-containing options */
   density?: 'compact' | 'comfortable';
   /** Popup horizontal alignment relative to trigger */
@@ -50,6 +52,7 @@ export function SelectWidget({
   popupClassName,
   renderTrigger,
   renderOption,
+  renderGroupHeader,
   density = 'compact',
   align = 'end',
   triggerBare = false,
@@ -132,7 +135,7 @@ export function SelectWidget({
 
     return Object.entries(groups).map(([group, items]) => (
       <div key={group || '__none'}>
-        {group && <div className={styles.groupHeader}>{group}</div>}
+        {group && (renderGroupHeader ? renderGroupHeader(group) : <div className={styles.groupHeader}>{group}</div>)}
         {items.map(item => renderItem(item, group))}
       </div>
     ));
