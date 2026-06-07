@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../stores';
 import { usePanel } from '../hooks/use-panel';
 import { hanaFetch } from '../hooks/use-hana-fetch';
@@ -58,6 +58,7 @@ export function AutomationPanel() {
   const [availableModels, setAvailableModels] = useState<ModelOption[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(currentAgentId);
   const [openJobs, setOpenJobs] = useState<Record<string, boolean>>({});
+  const agentTabsScrollerRef = useRef<HTMLDivElement>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -167,6 +168,21 @@ export function AutomationPanel() {
     }
   }, [activeAgentId, selectedAgentId]);
 
+  useEffect(() => {
+    if (!activeAgentId) return;
+    const scroller = agentTabsScrollerRef.current;
+    if (!scroller || scroller.scrollWidth <= scroller.clientWidth) return;
+    const item = scroller.querySelector(`[data-agent-id="${activeAgentId}"]`) as HTMLElement | null;
+    if (!item) return;
+    const containerRect = scroller.getBoundingClientRect();
+    const itemRect = item.getBoundingClientRect();
+    const itemLeft = itemRect.left - containerRect.left + scroller.scrollLeft;
+    const itemRight = itemLeft + itemRect.width;
+    if (itemLeft < scroller.scrollLeft || itemRight > scroller.scrollLeft + scroller.clientWidth) {
+      scroller.scrollLeft = itemLeft - (scroller.clientWidth - itemRect.width) / 2;
+    }
+  }, [activeAgentId]);
+
   if (!visible) return null;
 
   return (
@@ -195,7 +211,7 @@ export function AutomationPanel() {
               <div className={fp.automationEmpty}>{t('automation.empty')}</div>
             ) : (
               <>
-                <div className={styles.agentTabsShell}>
+                <div className={styles.agentTabsShell} ref={agentTabsScrollerRef}>
                   <div className={styles.agentTabs} role="tablist" aria-label={t('automation.agentTabs')}>
                     {tabs.map(agentId => {
                       const info = resolveAgentDisplayInfo({

@@ -12,6 +12,7 @@
     overflow-y: visible;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    scroll-behavior: smooth;
 }
 
 .agentTabsShell::-webkit-scrollbar {
@@ -20,16 +21,16 @@
 
 .agentTabs {
     width: max-content;
-    min-width: 100%;
+    min-width: max-content;
     display: flex;
     align-items: flex-start;
-    justify-content: center;
-    gap: 18px;
+    justify-content: flex-start;
+    gap: 14px;
 }
 
 .agentTab {
-    width: 58px;
-    flex: 0 0 58px;
+    width: 64px;
+    flex: 0 0 64px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -71,7 +72,8 @@
 }
 
 .agentTabName {
-    max-width: 68px;
+    width: 64px;
+    max-width: 64px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
