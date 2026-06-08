@@ -1613,7 +1613,7 @@
     display: inline-flex;
     width: clamp(220px, 50%, 360px);
     max-width: 100%;
-    aspect-ratio: 1 / 1;
+    aspect-ratio: 3 / 2;
     margin: var(--space-sm) 0;
     padding: 0.3rem;
     background: var(--bg-card, var(--bg));
@@ -1645,8 +1645,9 @@
 .mediaGenerationText {
     position: relative;
     z-index: 1;
-    width: min(52%, 220px);
+    width: 100%;
     min-width: 0;
+    padding: 0 1rem;
     text-align: center;
 }
 
