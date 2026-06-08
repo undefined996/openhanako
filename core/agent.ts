@@ -1413,12 +1413,28 @@ export class Agent {
     // 以下内容会在不同 session 之间变化（用户档案编辑、cwd 切换、记忆更新、时间戳推进），
     // 统一放在 prompt 末尾以保护前面静态前缀的 cache 命中率。
 
-    // 用户档案（user.md，用户偶尔手动编辑）
+    // 用户档案（user.md）
+    const configuredUserName = typeof this._config?.user?.name === "string"
+      ? this._config.user.name.trim()
+      : "";
+    const userProfileLines = [
+      isZh
+        ? "以下是用户的自我描述。"
+        : "The following is the user's self-description.",
+    ];
+    if (configuredUserName) {
+      userProfileLines.push(
+        isZh
+          ? `用户的名字叫：${configuredUserName}`
+          : `The user's name is: ${configuredUserName}`
+      );
+    }
+    if (userMd) {
+      userProfileLines.push("", userMd);
+    }
     parts.push(...section(
       isZh ? "# 用户档案" : "# User Profile",
-      isZh
-        ? "以下是用户的自我描述，由用户手动维护。\n\n" + userMd
-        : "The following is the user's self-description, manually maintained by the user.\n\n" + userMd
+      userProfileLines.join("\n")
     ));
 
     // ishiki（identity + yuan + ishiki 模板，含 {{userName}} 等替换）
