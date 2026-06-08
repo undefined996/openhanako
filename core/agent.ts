@@ -1192,6 +1192,11 @@ export class Agent {
         platformPrompt
       ));
     }
+    parts.push(isZh
+      ? "\n你的所有文本输出都会直接展示给用户。每次回复都必须包含面向用户的正文内容，不允许只产生内部思考就结束回复。"
+      : "\nAll your text output is displayed directly to the user. Every response must contain user-facing content; do not end a response with only internal thinking."
+    );
+
     // 记忆整体开关：master && session 都开启才注入记忆相关 prompt
     // Subagent 场景下整块跳过（无记忆工具 = 规则和 pinned 也是孤儿噪音）
     // 注意：记忆块本身已下移到 prompt 末尾（见下方），这里只是预先准备好规则文本
