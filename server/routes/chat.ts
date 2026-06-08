@@ -400,10 +400,12 @@ export function createChatRoute(engine: any, hub: any, { upgradeWebSocket }: any
 
   function buildDeferredResultContentEvents(sessionPath, event) {
     const events = [];
-    const interlude = buildDeferredResultInterludeBlock(event, {
-      receiverName: resolveDeferredReceiverName(engine, sessionPath),
-    });
-    if (interlude) events.push({ type: "content_block", block: interlude });
+    if (!event.meta?.suppressInterlude) {
+      const interlude = buildDeferredResultInterludeBlock(event, {
+        receiverName: resolveDeferredReceiverName(engine, sessionPath),
+      });
+      if (interlude) events.push({ type: "content_block", block: interlude });
+    }
 
     if (event.status === "success") {
       for (const block of enrichSessionFileBlocks(deferredResultFileBlocks(event.result, event.taskId), engine, sessionPath)) {

@@ -66,6 +66,7 @@ export function imageDeferredMeta({ prompt, deliveryTarget = null }: any = {}) {
     deliveryIntent: "ui_only",
     triggerParentTurn: false,
     notifyAgentOnFailure: true,
+    suppressInterlude: true,
     prompt,
     ...(deliveryTarget ? { deliveryTarget } : {}),
   };

@@ -136,6 +136,10 @@ export class DeferredResultCoordinator {
   }
 
   async _recordUiOnlyTask(taskId, task) {
+    if (task?.meta?.suppressInterlude) {
+      this.store.markDelivered(taskId);
+      return true;
+    }
     if (typeof this.recordCustomEntry !== "function") {
       this.log.warn?.(`[deferred-result] UI-only delivery unavailable for ${taskId}`);
       return false;
