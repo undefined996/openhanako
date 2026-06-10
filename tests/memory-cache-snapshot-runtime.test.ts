@@ -174,11 +174,12 @@ describe("cache snapshot reflection runtime", () => {
 
   it("write mode saves the cache snapshot draft as the official rolling summary", async () => {
     const sessionId = "2026-06-03T10-00-00-000Z_cache";
+    const writeSummary = "### 重要事实\n- 无\n\n### 事情经过\n- [2026-06-03 10:01] 用户在调缓存快照。";
     const summaryData = {
       session_id: sessionId,
       created_at: "2026-06-03T10:02:00.000Z",
       updated_at: "2026-06-03T10:02:00.000Z",
-      summary: "write summary",
+      summary: writeSummary,
       messageCount: 2,
     };
     const summaryManager = {
@@ -189,7 +190,7 @@ describe("cache snapshot reflection runtime", () => {
     };
     const memoryReflectionRunner = {
       runMemoryReflection: vi.fn().mockResolvedValue({
-        summary: "write summary",
+        summary: writeSummary,
         changed: true,
         data: summaryData,
         usage: { cache: { readTokens: 1200, missTokens: 4 } },
@@ -217,7 +218,7 @@ describe("cache snapshot reflection runtime", () => {
       status: "success",
       cacheStrategy: "session_snapshot",
       strict: true,
-      summaryPreview: "write summary",
+      summaryPreview: writeSummary,
     });
   });
 
@@ -254,6 +255,42 @@ describe("cache snapshot reflection runtime", () => {
       strict: false,
       degradeReason: "session_snapshot_contract_mismatch",
     });
+  });
+
+  it("write mode refuses format-violating reflection summaries and keeps the stored summary (#1628)", async () => {
+    const summaryManager = {
+      rollingSummary: vi.fn(),
+      createRollingSummaryDraft: vi.fn(),
+      saveSummary: vi.fn(),
+      getSummary: vi.fn().mockReturnValue(null),
+    };
+    const memoryReflectionRunner = {
+      runMemoryReflection: vi.fn().mockResolvedValue({
+        summary: "自由格式摘要，没有重要事实标题段。",
+        changed: true,
+        data: { session_id: "s1", summary: "自由格式摘要，没有重要事实标题段。" },
+        usage: { cache: { readTokens: 900, missTokens: 5 } },
+        metadata: {
+          cacheStrategy: "session_snapshot",
+          strict: true,
+          cachePrefixHash: "b".repeat(64),
+          parentCachePrefixHash: "a".repeat(64),
+        },
+      }),
+    };
+    const { ticker, agentDir, sessionPath } = makeTicker(tmpDir, "write", summaryManager, memoryReflectionRunner);
+    writeSession(sessionPath);
+
+    await expect(ticker.flushSession(sessionPath)).rejects.toThrow(/rolling summary format/i);
+    expect(summaryManager.saveSummary).not.toHaveBeenCalled();
+    const observation = readCacheSnapshotObservation(agentDir);
+    expect(observation).toMatchObject({
+      mode: "write",
+      status: "failed",
+      cacheStrategy: "session_snapshot",
+      strict: true,
+    });
+    expect(observation.reason).toMatch(/rolling summary format/i);
   });
 
   it("passes the runtime session model and usage context to the reflection runner", async () => {
@@ -324,7 +361,7 @@ describe("cache snapshot reflection runtime", () => {
     };
     const streamFn = vi.fn(async () => ({
       result: async () => ({
-        content: [{ type: "text", text: "ledger reflection summary" }],
+        content: [{ type: "text", text: "### 重要事实\n- 无\n\n### 事情经过\n- [2026-06-03 10:01] 用户在调缓存快照。" }],
         stopReason: "stop",
         usage: { input_tokens: 120, cache_read_input_tokens: 100, output_tokens: 16 },
       }),
@@ -374,6 +411,70 @@ describe("cache snapshot reflection runtime", () => {
     // 账本按 source/attribution 过滤要能找回这笔 reflection 账单（可追溯性）
     expect(realLedger.list({ subsystem: "memory", operation: "cache_snapshot_reflection" }).entries).toHaveLength(1);
     expect(realLedger.list({ attributionKind: "memory", agentId: "hana" }).entries).toHaveLength(1);
+  });
+
+  it("records format repair usage as a separate ledger entry with a distinguishable operation", async () => {
+    const summaryManager = {
+      rollingSummary: vi.fn(),
+      createRollingSummaryDraft: vi.fn(),
+      saveSummary: vi.fn(),
+      getSummary: vi.fn().mockReturnValue(null),
+    };
+    let requestSequence = 0;
+    const realLedger = createUsageLedger({
+      requestIdFactory: () => `req-reflection-${++requestSequence}`,
+    });
+    const requestModelForSnapshot = {
+      id: "memory-model",
+      provider: "deepseek",
+      api: "openai-completions",
+      baseUrl: "http://localhost:1234",
+    };
+    const validSummary = "### 重要事实\n- 无\n\n### 事情经过\n- [2026-06-03 10:01] 用户在调缓存快照。";
+    const streamFn = vi.fn()
+      .mockResolvedValueOnce({
+        result: async () => ({
+          content: [{ type: "text", text: "用户今天聊了聊缓存快照，没别的。" }],
+          stopReason: "stop",
+          usage: { input_tokens: 120, output_tokens: 16 },
+        }),
+      })
+      .mockResolvedValueOnce({
+        result: async () => ({
+          content: [{ type: "text", text: validSummary }],
+          stopReason: "stop",
+          usage: { input_tokens: 140, output_tokens: 20 },
+        }),
+      });
+    const { ticker, sessionPath } = makeTicker(tmpDir, "write", summaryManager, undefined, {
+      usageLedger: realLedger,
+      buildSessionCacheSnapshot: vi.fn((snapshotSessionPath, { reason, messages }) => buildSessionCacheSnapshot({
+        sessionPath: snapshotSessionPath,
+        reason,
+        model: requestModelForSnapshot,
+        cacheKeyParams: { thinkingLevel: "medium" },
+        systemPrompt: "You are Hana.",
+        tools: [{ name: "read", description: "Read files", parameters: { type: "object" } }],
+        messages,
+      })),
+      getSessionStreamFn: vi.fn(() => streamFn),
+    });
+    writeSession(sessionPath);
+
+    await ticker.flushSession(sessionPath);
+
+    expect(streamFn).toHaveBeenCalledTimes(2);
+    expect(summaryManager.saveSummary).toHaveBeenCalledWith("2026-06-03T10-00-00-000Z_cache", expect.objectContaining({ summary: validSummary }));
+
+    // 初次生成与格式修复各落一笔账，operation 可区分（修复不混进初次的账目）
+    const { entries } = realLedger.list({});
+    expect(entries).toHaveLength(2);
+    expect(entries[0].source.operation).toBe("cache_snapshot_reflection");
+    expect(entries[1].source.operation).toBe("cache_snapshot_reflection_repair");
+    expect(entries[1].source).toMatchObject({ subsystem: "memory", surface: "system", trigger: "manual" });
+    expect(entries[1].attribution).toEqual({ kind: "memory", agentId: "hana" });
+    expect(realLedger.list({ subsystem: "memory", operation: "cache_snapshot_reflection" }).entries).toHaveLength(1);
+    expect(realLedger.list({ subsystem: "memory", operation: "cache_snapshot_reflection_repair" }).entries).toHaveLength(1);
   });
 
   it("writes bounded failure diagnostics for shadow reflection errors", async () => {
