@@ -222,6 +222,74 @@ describe("cache snapshot reflection runtime", () => {
     });
   });
 
+  it("write mode falls back to official rolling summary when the live session snapshot is unavailable (#1651)", async () => {
+    const summaryManager = {
+      rollingSummary: vi.fn().mockResolvedValue("official summary"),
+      createRollingSummaryDraft: vi.fn(),
+      saveSummary: vi.fn(),
+      getSummary: vi.fn().mockReturnValue(null),
+    };
+    const memoryReflectionRunner = {
+      runMemoryReflection: vi.fn(),
+    };
+    const buildSessionCacheSnapshot = vi.fn(() => {
+      throw new Error("Session cache snapshot unavailable: unknown session /tmp/cold.jsonl");
+    });
+    const { ticker, agentDir, sessionPath } = makeTicker(tmpDir, "write", summaryManager, memoryReflectionRunner, {
+      buildSessionCacheSnapshot,
+    });
+    writeSession(sessionPath);
+
+    await ticker.flushSession(sessionPath);
+
+    expect(buildSessionCacheSnapshot).toHaveBeenCalledOnce();
+    expect(memoryReflectionRunner.runMemoryReflection).not.toHaveBeenCalled();
+    expect(summaryManager.rollingSummary).toHaveBeenCalledWith(
+      "2026-06-03T10-00-00-000Z_cache",
+      expect.any(Array),
+      expect.anything(),
+      expect.objectContaining({ timeZone: expect.any(String) }),
+    );
+    expect(summaryManager.saveSummary).not.toHaveBeenCalled();
+
+    const observation = readCacheSnapshotObservation(agentDir);
+    expect(observation).toMatchObject({
+      mode: "write",
+      status: "failed",
+      cacheStrategy: "cache_recovery",
+      strict: false,
+    });
+    expect(observation.reason).toMatch(/snapshot unavailable/i);
+  });
+
+  it("startup recovery uses the same rolling summary fallback for cold sessions in write mode (#1666)", async () => {
+    const summaryManager = {
+      rollingSummary: vi.fn().mockResolvedValue("official recovery summary"),
+      createRollingSummaryDraft: vi.fn(),
+      saveSummary: vi.fn(),
+      getSummary: vi.fn().mockReturnValue(null),
+    };
+    const memoryReflectionRunner = {
+      runMemoryReflection: vi.fn(),
+    };
+    const { ticker, sessionPath } = makeTicker(tmpDir, "write", summaryManager, memoryReflectionRunner, {
+      buildSessionCacheSnapshot: vi.fn(() => {
+        throw new Error("Session cache snapshot unavailable: unknown session after restart");
+      }),
+    });
+    writeSession(sessionPath);
+
+    await ticker.tick();
+
+    expect(memoryReflectionRunner.runMemoryReflection).not.toHaveBeenCalled();
+    expect(summaryManager.rollingSummary).toHaveBeenCalledWith(
+      "2026-06-03T10-00-00-000Z_cache",
+      expect.any(Array),
+      expect.anything(),
+      expect.objectContaining({ timeZone: expect.any(String) }),
+    );
+  });
+
   it("write mode refuses non-strict reflection results", async () => {
     const summaryManager = {
       rollingSummary: vi.fn(),

@@ -85,6 +85,7 @@ import { createStudioWorkspacesRoute } from "./routes/studio-workspaces.ts";
 import { createMobileStaticRoute } from "./routes/mobile-static.ts";
 import { createHtmlPreviewRoute } from "./routes/html-preview.ts";
 import { createAccessRoute } from "./routes/access.ts";
+import { createMediaRoute } from "./routes/media.ts";
 import { createSpeechRecognitionRoute } from "./routes/speech-recognition.ts";
 import { registerTaskRegistryBusHandlers } from "./task-bus-handlers.ts";
 import { configureProcessPiSdkEnv, ensureHanaPiSdkDirs, resolveHanakoHome } from "../shared/hana-runtime-paths.ts";
@@ -249,7 +250,13 @@ await bindServerTransportOwnership(server, {
 
 // ── 首次运行播种 ──
 log.log("① ensureFirstRun...");
-ensureFirstRun(hanakoHome, productDir);
+const firstRunReport = ensureFirstRun(hanakoHome, productDir);
+for (const invalid of firstRunReport.invalidAgentDirs) {
+  log.warn(`① 发现无效 agent 目录（已跳过启动校验）: "${invalid.id}" (${invalid.reason})`);
+}
+if (firstRunReport.defaultConfigBackupPath) {
+  log.warn(`① 默认助手 config.yaml 已损坏，原文件备份于: ${firstRunReport.defaultConfigBackupPath}`);
+}
 log.log("① ensureFirstRun 完成");
 
 log.log("① ensureLocalIdentityRegistries...");
@@ -773,6 +780,7 @@ app.route("/api", createBridgeRoute(engine, bridgeManagerRef));
 app.route("/api", createAuthRoute(engine));
 app.route("/api", createDiaryRoute(engine));
 app.route("/api", createConfirmRoute(confirmStore, engine));
+app.route("/api", createMediaRoute(engine));
 app.route("/api", createPluginsRoute(engine));
 app.route("/api", createCheckpointsRoute(engine));
 app.route("/api", createCommandsRoute(engine));

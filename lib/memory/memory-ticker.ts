@@ -260,6 +260,12 @@ export function createMemoryTicker(opts) {
     };
   }
 
+  function _isRecoverableSessionSnapshotUnavailable(err) {
+    const message = String(err?.message || err || "");
+    if (/session cache snapshot unavailable/i.test(message)) return true;
+    return /snapshot/i.test(message) && /unknown session/i.test(message);
+  }
+
   async function _runSessionSnapshotMemoryReflection({
     sessionPath,
     sessionId,
@@ -424,15 +430,24 @@ export function createMemoryTicker(opts) {
       const resolvedModel = getResolvedMemoryModel();
       const cacheSnapshotMode = _getCacheSnapshotReflectionMode();
       if (cacheSnapshotMode === "write") {
-        await _runSessionSnapshotMemoryReflection({
-          sessionPath,
-          sessionId,
-          messages,
-          resolvedModel,
-          rollingOptions,
-          mode: "write",
-          trigger,
-        });
+        try {
+          await _runSessionSnapshotMemoryReflection({
+            sessionPath,
+            sessionId,
+            messages,
+            resolvedModel,
+            rollingOptions,
+            mode: "write",
+            trigger,
+          });
+        } catch (err) {
+          if (!_isRecoverableSessionSnapshotUnavailable(err)) throw err;
+          debugLog()?.warn?.(
+            "memory",
+            `cache snapshot unavailable for ${path.basename(sessionPath)}; falling back to rolling summary`,
+          );
+          await summaryManager.rollingSummary(sessionId, messages, resolvedModel, rollingOptions);
+        }
       } else {
         await summaryManager.rollingSummary(sessionId, messages, resolvedModel, rollingOptions);
         if (cacheSnapshotMode === "shadow") {

@@ -94,6 +94,10 @@ import {
 } from "./session-prompt-snapshot.ts";
 
 const log = createModuleLogger("session");
+const SESSION_META_PAYLOAD_DIR = "session-meta-payloads";
+const SESSION_META_PAYLOAD_FIELDS = ["promptSnapshot", "memoryReflectionSnapshot"];
+const SESSION_META_PAYLOAD_INLINE_LIMIT_BYTES = 256 * 1024;
+const SESSION_META_INDEX_MAX_BYTES = 1024 * 1024;
 
 /** 巡检/定时任务默认工具白名单（"*" = 与 chat 一致，全部放行） */
 export const PATROL_TOOLS_DEFAULT = "*";
@@ -1154,8 +1158,7 @@ export class SessionCoordinator {
         const metaPathForRestore = path.join(agent.sessionDir, "session-meta.json");
         let metaEntry = null;
         try {
-          const raw = await fsp.readFile(metaPathForRestore, "utf-8");
-          const meta = JSON.parse(raw);
+          const meta = await this._readMetaCached(metaPathForRestore);
           metaEntry = meta[path.basename(sessionPath)];
         } catch (err) {
           if (err.code !== "ENOENT") {
@@ -1694,6 +1697,11 @@ export class SessionCoordinator {
     if (!sessionPath) return null;
     try {
       const metaPath = this._sessionMetaPathFor(sessionPath);
+      const stat = fs.statSync(metaPath);
+      if (stat.size > SESSION_META_INDEX_MAX_BYTES) {
+        log.warn(`session-meta is too large to parse safely (${stat.size} bytes): ${metaPath}`);
+        return null;
+      }
       const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
       const entry = meta[path.basename(sessionPath)];
       return entry && typeof entry === "object" ? entry : null;
@@ -3286,7 +3294,7 @@ export class SessionCoordinator {
     const sessKey = path.basename(sessionPath);
     let meta = {};
     try {
-      meta = JSON.parse(await fsp.readFile(metaPath, "utf-8"));
+      meta = await this._readMetaCached(metaPath);
     } catch (err) {
       if (expectedPinnedAt === null && err.code === "ENOENT") return;
       throw new Error(`setSessionPinned: verify failed for ${sessKey}: ${err.message}`);
@@ -3408,8 +3416,13 @@ export class SessionCoordinator {
       return cached.data;
     }
     try {
+      const stat = await fsp.stat(metaPath);
+      if (stat.size > SESSION_META_INDEX_MAX_BYTES) {
+        log.warn(`session-meta is too large to parse safely (${stat.size} bytes): ${metaPath}`);
+        return {};
+      }
       const raw = await fsp.readFile(metaPath, "utf-8");
-      const data = JSON.parse(raw);
+      const data = await this._hydrateSessionMetaPayloads(metaPath, JSON.parse(raw));
       this._metaCache.set(metaPath, { data, ts: Date.now() });
       return data;
     } catch {
@@ -3575,12 +3588,7 @@ export class SessionCoordinator {
 
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        let meta = {};
-        try {
-          meta = JSON.parse(await fsp.readFile(metaPath, "utf-8"));
-        } catch {
-          // file missing or parse error → start fresh
-        }
+        const meta = await this._readSessionMetaIndexForWrite(metaPath);
         meta[sessKey] = {
           ...meta[sessKey],
           ...partial,
@@ -3588,6 +3596,7 @@ export class SessionCoordinator {
         // model is owned by PI SDK via session JSONL — keep session-meta clean
         delete meta[sessKey].model;
         delete meta[sessKey].modelId;
+        meta[sessKey] = await this._externalizeSessionMetaPayloads(metaPath, sessKey, meta[sessKey]);
         await fsp.writeFile(metaPath, JSON.stringify(meta, null, 2));
         this.invalidateMetaCache(metaPath);
         return;
@@ -3601,6 +3610,109 @@ export class SessionCoordinator {
         }
       }
     }
+  }
+
+  _isSessionMetaPayloadRef(value: any, field?: any) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+    if (value.kind !== "session-meta-payload") return false;
+    if (field && value.field !== field) return false;
+    return typeof value.path === "string" && value.path.length > 0;
+  }
+
+  _sessionMetaPayloadRelativePath(sessKey: any, field: any) {
+    return path.join(SESSION_META_PAYLOAD_DIR, `${encodeURIComponent(sessKey)}.${field}.json`);
+  }
+
+  _sessionMetaPayloadAbsolutePath(metaPath: any, refPath: any) {
+    return path.join(path.dirname(metaPath), refPath);
+  }
+
+  async _readSessionMetaIndexForWrite(metaPath: any) {
+    try {
+      const stat = await fsp.stat(metaPath);
+      if (stat.size > SESSION_META_INDEX_MAX_BYTES) {
+        await this._quarantineOversizedSessionMeta(metaPath);
+        return {};
+      }
+    } catch (err) {
+      if (err?.code !== "ENOENT") {
+        log.warn(`session-meta stat failed for write: ${err.message}`);
+      }
+      return {};
+    }
+    try {
+      return JSON.parse(await fsp.readFile(metaPath, "utf-8"));
+    } catch {
+      return {};
+    }
+  }
+
+  async _quarantineOversizedSessionMeta(metaPath: any) {
+    try {
+      const backupPath = path.join(
+        path.dirname(metaPath),
+        `session-meta.oversized.${Date.now()}.json`,
+      );
+      await fsp.rename(metaPath, backupPath);
+      this.invalidateMetaCache(metaPath);
+      log.warn(`oversized session-meta quarantined: ${backupPath}`);
+    } catch (err) {
+      if (err?.code !== "ENOENT") {
+        log.warn(`oversized session-meta quarantine failed: ${err.message}`);
+      }
+    }
+  }
+
+  async _externalizeSessionMetaPayloads(metaPath: any, sessKey: any, entry: any) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return entry;
+    const next = { ...entry };
+    for (const field of SESSION_META_PAYLOAD_FIELDS) {
+      const value = next[field];
+      if (value === undefined || this._isSessionMetaPayloadRef(value, field)) continue;
+      let encoded = "";
+      try {
+        encoded = JSON.stringify(value);
+      } catch {
+        continue;
+      }
+      if (Buffer.byteLength(encoded, "utf-8") <= SESSION_META_PAYLOAD_INLINE_LIMIT_BYTES) continue;
+      const relPath = this._sessionMetaPayloadRelativePath(sessKey, field);
+      const absPath = this._sessionMetaPayloadAbsolutePath(metaPath, relPath);
+      await fsp.mkdir(path.dirname(absPath), { recursive: true });
+      await fsp.writeFile(absPath, encoded, "utf-8");
+      next[field] = {
+        kind: "session-meta-payload",
+        version: 1,
+        field,
+        path: relPath,
+      };
+    }
+    return next;
+  }
+
+  async _hydrateSessionMetaPayloads(metaPath: any, data: any) {
+    if (!data || typeof data !== "object") return {};
+    const hydrated = {};
+    for (const [sessKey, entry] of Object.entries(data)) {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+        hydrated[sessKey] = entry;
+        continue;
+      }
+      const next = { ...(entry as any) };
+      for (const field of SESSION_META_PAYLOAD_FIELDS) {
+        const ref = next[field];
+        if (!this._isSessionMetaPayloadRef(ref, field)) continue;
+        try {
+          const raw = await fsp.readFile(this._sessionMetaPayloadAbsolutePath(metaPath, ref.path), "utf-8");
+          next[field] = JSON.parse(raw);
+        } catch (err) {
+          log.warn(`session-meta payload read failed for ${sessKey}/${field}: ${err.message}`);
+          delete next[field];
+        }
+      }
+      hydrated[sessKey] = next;
+    }
+    return hydrated;
   }
 
   _sessionMetaPathFor(sessionPath: any) {
@@ -3626,7 +3738,7 @@ export class SessionCoordinator {
     const sessionFileName = path.basename(sessionPath);
     const metaPath = path.join(agent.sessionDir, "session-meta.json");
     try {
-      const meta = JSON.parse(await fsp.readFile(metaPath, "utf-8"));
+      const meta = await this._readMetaCached(metaPath);
       if (Array.isArray(meta?.[sessionFileName]?.toolNames)) return;
     } catch (err) {
       if (err.code !== "ENOENT") {

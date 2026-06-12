@@ -1718,6 +1718,38 @@
     }
   },
   "anthropic": {
+    "claude-fable-5": {
+      "name": "Claude Fable 5",
+      "context": 1000000,
+      "maxOutput": 128000,
+      "image": true,
+      "reasoning": true,
+      "visionCapabilities": {
+        "grounding": true,
+        "boxes": true,
+        "points": true,
+        "coordinateSpace": "norm-1000",
+        "boxOrder": "xyxy",
+        "outputFormat": "anchor",
+        "groundingMode": "prompted"
+      }
+    },
+    "claude-mythos-5": {
+      "name": "Claude Mythos 5",
+      "context": 1000000,
+      "maxOutput": 128000,
+      "image": true,
+      "reasoning": true,
+      "visionCapabilities": {
+        "grounding": true,
+        "boxes": true,
+        "points": true,
+        "coordinateSpace": "norm-1000",
+        "boxOrder": "xyxy",
+        "outputFormat": "anchor",
+        "groundingMode": "prompted"
+      }
+    },
     "claude-opus-4-7": {
       "name": "Claude Opus 4.7",
       "context": 1000000,

@@ -58,6 +58,20 @@ describe("known-models dictionary", () => {
       image: true,
       reasoning: true,
     });
+    expect(lookupKnown("anthropic", "claude-fable-5")).toMatchObject({
+      name: "Claude Fable 5",
+      context: 1000000,
+      maxOutput: 128000,
+      image: true,
+      reasoning: true,
+    });
+    expect(lookupKnown("anthropic", "claude-mythos-5")).toMatchObject({
+      name: "Claude Mythos 5",
+      context: 1000000,
+      maxOutput: 128000,
+      image: true,
+      reasoning: true,
+    });
     expect(lookupKnown("dashscope", "qwen3.6-plus")).toMatchObject({
       context: 1000000,
       maxOutput: 65536,
