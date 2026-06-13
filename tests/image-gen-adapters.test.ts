@@ -358,6 +358,130 @@ describe("openai adapter", () => {
   });
 });
 
+describe("agnes adapters", () => {
+  beforeEach(() => mockFetch.mockReset());
+
+  it("submits text-to-image requests using Agnes image response_format inside extra_body", async () => {
+    const { agnesImageAdapter } = await import("../plugins/image-gen/adapters/agnes.ts");
+
+    const fakeB64 = Buffer.from("agnes-image").toString("base64");
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ data: [{ b64_json: fakeB64 }] }),
+    });
+
+    const ctx = makeBusCtx("agnes-key", "https://apihub.agnes-ai.com/v1", "agnes");
+    const result = await agnesImageAdapter.submit({
+      prompt: "a quiet handmade notebook",
+      modelId: "agnes-image-2.1-flash",
+      ratio: "4:3",
+      resolution: "1k",
+      filename: "agnes-test",
+      providerId: "agnes",
+      credentialProviderId: "agnes",
+    }, ctx);
+
+    const [url, opts] = mockFetch.mock.calls[0];
+    expect(url).toBe("https://apihub.agnes-ai.com/v1/images/generations");
+    expect(opts.headers["Authorization"]).toBe("Bearer agnes-key");
+    expect(opts.headers["Content-Type"]).toBe("application/json");
+    const body = JSON.parse(opts.body);
+    expect(body).toMatchObject({
+      model: "agnes-image-2.1-flash",
+      prompt: "a quiet handmade notebook",
+      size: "1024x768",
+      extra_body: { response_format: "b64_json" },
+    });
+    expect(body).not.toHaveProperty("response_format");
+    expect(result.files).toEqual(["agnes-test-abc.png"]);
+  });
+
+  it("submits image-to-image references in Agnes extra_body.image", async () => {
+    const { agnesImageAdapter } = await import("../plugins/image-gen/adapters/agnes.ts");
+
+    const fakeB64 = Buffer.from("agnes-edit").toString("base64");
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ data: [{ b64_json: fakeB64 }] }),
+    });
+
+    const ctx = makeBusCtx("agnes-key", "https://apihub.agnes-ai.com/v1", "agnes");
+    await agnesImageAdapter.submit({
+      prompt: "make it warmer",
+      modelId: "agnes-image-2.1-flash",
+      image: ["https://example.com/input.png"],
+      providerId: "agnes",
+      credentialProviderId: "agnes",
+    }, ctx);
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.extra_body).toMatchObject({
+      image: ["https://example.com/input.png"],
+      response_format: "b64_json",
+    });
+    expect(body).not.toHaveProperty("image");
+  });
+
+  it("submits Agnes video tasks and queries completed videos from the recommended video_id endpoint", async () => {
+    const { agnesVideoAdapter } = await import("../plugins/image-gen/adapters/agnes.ts");
+
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          task_id: "task_123",
+          video_id: "video_123",
+          status: "queued",
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          task_id: "task_123",
+          video_id: "video_123",
+          status: "completed",
+          remixed_from_video_id: "https://storage.example.com/agnes.mp4",
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        arrayBuffer: async () => Buffer.from("video-bytes"),
+      });
+
+    const ctx = makeBusCtx("agnes-key", "https://apihub.agnes-ai.com/v1", "agnes");
+    const submitResult = await agnesVideoAdapter.submit({
+      prompt: "slow camera move over a notebook",
+      modelId: "agnes-video-v2.0",
+      ratio: "3:2",
+      duration: 5,
+      providerId: "agnes",
+      credentialProviderId: "agnes",
+    }, ctx);
+
+    expect(submitResult).toMatchObject({
+      taskId: "task_123",
+      providerTaskId: "video_123",
+    });
+    const createBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(mockFetch.mock.calls[0][0]).toBe("https://apihub.agnes-ai.com/v1/videos");
+    expect(createBody).toMatchObject({
+      model: "agnes-video-v2.0",
+      prompt: "slow camera move over a notebook",
+      width: 1152,
+      height: 768,
+    });
+
+    const queryResult = await agnesVideoAdapter.query("video_123", ctx);
+
+    expect(mockFetch.mock.calls[1][0]).toBe("https://apihub.agnes-ai.com/agnesapi?video_id=video_123");
+    expect(mockFetch.mock.calls[2][0]).toBe("https://storage.example.com/agnes.mp4");
+    expect(queryResult).toMatchObject({
+      status: "success",
+      files: ["video_123.mp4"],
+    });
+  });
+});
+
 describe("openai codex oauth adapter", () => {
   beforeEach(() => mockFetch.mockReset());
 

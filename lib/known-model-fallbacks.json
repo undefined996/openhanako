@@ -1,5 +1,15 @@
 {
   "_comment": "供应商分区未命中时使用的通用模型参考值。它是 unknown/custom provider 的 best-effort baseline，不覆盖 provider-specific known-models.json 条目，也不覆盖用户显式填写的模型字段。",
+  "agnes-2.0-flash": {
+    "name": "Agnes 2.0 Flash",
+    "image": true,
+    "reasoning": true,
+    "toolUse": {
+      "supportsTools": true,
+      "dialect": "openai",
+      "toolResultFormat": "message"
+    }
+  },
   "claude-fable-5": {
     "name": "Claude Fable 5",
     "context": 1000000,

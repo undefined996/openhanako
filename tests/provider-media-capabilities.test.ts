@@ -58,6 +58,41 @@ describe("ProviderRegistry media capabilities", () => {
     ]));
   });
 
+  it("exposes Agnes chat, image, and video capabilities from its provider plugin", () => {
+    const registry = new ProviderRegistry(tmpHome);
+    registry.reload();
+
+    expect(registry.get("agnes")).toMatchObject({
+      id: "agnes",
+      displayName: "Agnes AI",
+      baseUrl: "https://apihub.agnes-ai.com/v1",
+      api: "openai-completions",
+    });
+    expect(registry.getDefaultModels("agnes")).toEqual(["agnes-2.0-flash"]);
+    expect(registry.resolveMediaModel({
+      providerId: "agnes",
+      modelId: "agnes-image-2.1-flash",
+      capability: "image_generation",
+    })).toMatchObject({
+      providerId: "agnes",
+      model: expect.objectContaining({
+        id: "agnes-image-2.1-flash",
+        protocolId: "agnes-images",
+      }),
+    });
+    expect(registry.resolveMediaModel({
+      providerId: "agnes",
+      modelId: "agnes-video-v2.0",
+      capability: "video_generation",
+    })).toMatchObject({
+      providerId: "agnes",
+      model: expect.objectContaining({
+        id: "agnes-video-v2.0",
+        protocolId: "agnes-videos",
+      }),
+    });
+  });
+
   it("uses MiniMax Token Plan credentials as a MiniMax image generation lane", () => {
     fs.writeFileSync(path.join(tmpHome, "added-models.yaml"), YAML.dump({
       providers: {

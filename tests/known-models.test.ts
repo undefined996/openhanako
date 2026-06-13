@@ -156,6 +156,20 @@ describe("known-models dictionary", () => {
     expect(defaultModels.zhipu[0]).toBe("glm-5.2");
   });
 
+  it("declares Agnes 2.0 Flash as a curated OpenAI-compatible multimodal agent model", () => {
+    expect(defaultModels.agnes).toEqual(["agnes-2.0-flash"]);
+    expect(lookupKnown("agnes", "agnes-2.0-flash")).toMatchObject({
+      name: "Agnes 2.0 Flash",
+      image: true,
+      reasoning: true,
+      toolUse: {
+        supportsTools: true,
+        dialect: "openai",
+        toolResultFormat: "message",
+      },
+    });
+  });
+
   it("uses generic model fallbacks when a provider has no provider-specific entry", () => {
     expect(lookupKnown("volcengine", "kimi-k2.6")).toMatchObject({
       name: "Kimi K2.6",

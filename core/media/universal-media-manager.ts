@@ -19,9 +19,11 @@ import { openaiCodexImageAdapter } from "../../plugins/image-gen/adapters/openai
 import { minimaxImageAdapter } from "../../plugins/image-gen/adapters/minimax.ts";
 import { dashscopeImageAdapter } from "../../plugins/image-gen/adapters/dashscope.ts";
 import { geminiImageAdapter } from "../../plugins/image-gen/adapters/gemini.ts";
+import { agnesImageAdapter, agnesVideoAdapter } from "../../plugins/image-gen/adapters/agnes.ts";
 
 const log = createModuleLogger("media");
 const IMAGE_CAPABILITY = "image_generation";
+const VIDEO_CAPABILITY = "video_generation";
 
 const IMAGE_GENERATION_CONFIG_SCHEMA = normalizePluginConfigSchema("image-gen", {
   properties: {
@@ -246,6 +248,8 @@ export class UniversalMediaManager {
       minimaxImageAdapter,
       dashscopeImageAdapter,
       geminiImageAdapter,
+      agnesImageAdapter,
+      agnesVideoAdapter,
     ]) {
       this.registerAdapter(adapter);
     }
@@ -527,9 +531,8 @@ export class UniversalMediaManager {
     const delivery = normalizeMediaDelivery(input);
     const responseDelivery = isResponseDelivery(delivery);
     if (!sessionPath && !responseDelivery) throw new Error("sessionPath is required");
-    const adapter = input.provider
-      ? this._registry.get(input.provider)
-      : this._registry.getByType("video").at(-1) || null;
+    const target = this._resolveVideoTarget(input);
+    const adapter = target?.adapter || null;
     if (!adapter) throw new Error(t("toolDef.generateVideo.noProvider"));
 
     const batchId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -539,7 +542,11 @@ export class UniversalMediaManager {
       ...(input.image && { image: input.image }),
       ...(input.duration && { duration: input.duration }),
       ...(input.ratio && { ratio: input.ratio }),
-      ...(input.model && { model: input.model }),
+      ...(target?.providerId ? { providerId: target.providerId } : {}),
+      ...(target?.modelId ? { modelId: target.modelId, model: target.modelId } : (input.model ? { model: input.model } : {})),
+      ...(target?.protocolId ? { protocolId: target.protocolId } : {}),
+      ...(target?.credentialLaneId ? { credentialLaneId: target.credentialLaneId } : {}),
+      ...(target?.credentialProviderId ? { credentialProviderId: target.credentialProviderId } : {}),
     };
     const result = await adapter.submit(params, this._submitContext());
     if (!result?.taskId) throw new Error(t("toolDef.generateVideo.submitFailedUnknown"));
@@ -547,6 +554,7 @@ export class UniversalMediaManager {
     this._store.add({
       taskId: result.taskId,
       adapterId: adapter.id,
+      ...(result.providerTaskId || result.adapterTaskId ? { adapterTaskId: result.providerTaskId || result.adapterTaskId } : {}),
       batchId,
       type: "video",
       prompt: input.prompt,
@@ -554,6 +562,11 @@ export class UniversalMediaManager {
       sessionPath,
       deliveryMode: delivery.mode,
       delivery,
+      ...(target?.providerId ? { providerId: target.providerId } : {}),
+      ...(target?.modelId ? { modelId: target.modelId } : {}),
+      ...(target?.protocolId ? { protocolId: target.protocolId } : {}),
+      ...(target?.credentialLaneId ? { credentialLaneId: target.credentialLaneId } : {}),
+      ...(target?.credentialProviderId ? { credentialProviderId: target.credentialProviderId } : {}),
     });
     if (result.files?.length) {
       this._store.update(result.taskId, { files: result.files });
@@ -589,6 +602,113 @@ export class UniversalMediaManager {
       prompt: input.prompt,
       delivery,
       tasks: [{ taskId: result.taskId }],
+    };
+  }
+
+  _resolveVideoTarget(input: any = {}) {
+    const providerId = textOrNull(input.provider);
+    const modelId = textOrNull(input.model) || textOrNull(input.modelId);
+
+    if (providerId && modelId) {
+      try {
+        return this._videoTargetFromMediaRef({ providerId, modelId });
+      } catch (err) {
+        const legacyAdapter = this._registry.get(providerId);
+        if (legacyAdapter) {
+          return {
+            adapter: legacyAdapter,
+            providerId,
+            modelId,
+            protocolId: legacyAdapter.protocolId || null,
+            credentialLaneId: null,
+            credentialProviderId: providerId,
+          };
+        }
+        throw err;
+      }
+    }
+
+    if (providerId) {
+      const provider = this._providers.getMediaProviders(VIDEO_CAPABILITY)
+        .find((item) => item.providerId === providerId);
+      for (const model of provider?.models || []) {
+        const target = this._videoTargetFromMediaRef({ providerId, modelId: model.id }, { strict: false });
+        if (target) return target;
+      }
+      const adapter = this._registry.get(providerId);
+      if (adapter) {
+        return {
+          adapter,
+          providerId,
+          modelId: null,
+          protocolId: adapter.protocolId || null,
+          credentialLaneId: null,
+          credentialProviderId: providerId,
+        };
+      }
+      return null;
+    }
+
+    if (modelId) {
+      const matches = [];
+      for (const provider of this._providers.getMediaProviders(VIDEO_CAPABILITY) || []) {
+        if (provider.models?.some?.((model) => model.id === modelId || model.aliases?.includes?.(modelId))) {
+          matches.push({ providerId: provider.providerId, modelId });
+        }
+      }
+      if (matches.length > 1) throw new Error(`Video model "${modelId}" is available from multiple providers`);
+      if (matches.length === 1) return this._videoTargetFromMediaRef(matches[0]);
+      throw new Error(`Video model "${modelId}" not found`);
+    }
+
+    for (const provider of this._providers.getMediaProviders(VIDEO_CAPABILITY) || []) {
+      for (const model of provider.models || []) {
+        const target = this._videoTargetFromMediaRef({ providerId: provider.providerId, modelId: model.id }, { strict: false });
+        if (target) return target;
+      }
+    }
+
+    const adapter = this._registry.getByType("video").at(-1) || null;
+    if (!adapter) return null;
+    return {
+      adapter,
+      providerId: adapter.id || null,
+      modelId: null,
+      protocolId: adapter.protocolId || null,
+      credentialLaneId: null,
+      credentialProviderId: adapter.id || null,
+    };
+  }
+
+  _videoTargetFromMediaRef(ref, { strict = true }: any = {}) {
+    let resolved;
+    try {
+      resolved = this._providers.resolveMediaModel({
+        providerId: ref.providerId,
+        modelId: ref.modelId,
+        capability: VIDEO_CAPABILITY,
+      });
+    } catch (err) {
+      if (strict) throw err;
+      return null;
+    }
+    const protocolId = resolved?.model?.protocolId;
+    if (!protocolId) {
+      if (strict) throw new Error(`Media model "${ref.providerId}/${ref.modelId}" missing protocolId`);
+      return null;
+    }
+    const adapter = this._registry.getProtocol?.(protocolId) || this._registry.get?.(resolved.providerId);
+    if (!adapter) {
+      if (strict) throw new Error(`No video generation adapter registered for protocol "${protocolId}"`);
+      return null;
+    }
+    return {
+      adapter,
+      providerId: resolved.providerId,
+      modelId: resolved.model.id,
+      protocolId,
+      credentialLaneId: resolved.credentialLane?.id || null,
+      credentialProviderId: resolved.credentialLane?.providerId || resolved.providerId,
     };
   }
 

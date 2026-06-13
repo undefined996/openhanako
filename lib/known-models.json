@@ -1,5 +1,17 @@
 {
   "_comment": "模型参考词典。provider + model 为唯一键。model-sync.js 对表时查询。image/video/reasoning 缺省为 false，quirks 缺省为 []。image/video 映射到 Pi SDK Model.input 数组。",
+  "agnes": {
+    "agnes-2.0-flash": {
+      "name": "Agnes 2.0 Flash",
+      "image": true,
+      "reasoning": true,
+      "toolUse": {
+        "supportsTools": true,
+        "dialect": "openai",
+        "toolResultFormat": "message"
+      }
+    }
+  },
   "dashscope": {
     "qwen3.5-plus": {
       "name": "Qwen 3.5 Plus",

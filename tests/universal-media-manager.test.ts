@@ -343,4 +343,63 @@ describe("UniversalMediaManager response delivery", () => {
 
     manager.stop();
   });
+
+  it("resolves explicit video provider and model through media capabilities before selecting an adapter", async () => {
+    const root = makeRoot();
+    roots.push(root);
+    const providerRegistry = {
+      getMediaProviders: () => [],
+      resolveMediaModel: vi.fn(() => ({
+        providerId: "agnes",
+        model: { id: "agnes-video-v2.0", protocolId: "agnes-videos" },
+        credentialLane: null,
+      })),
+    };
+    const manager = new UniversalMediaManager({
+      hanakoHome: root,
+      preferences: makePreferences(root),
+      providerRegistry,
+      registerSessionFile: () => {},
+    });
+    const bus = makeBus();
+    manager.start(bus);
+    const submit = vi.fn(async () => ({ taskId: "agnes-video-task", providerTaskId: "provider-task" }));
+    manager.registerAdapter({
+      id: "agnes",
+      protocolId: "agnes-videos",
+      types: ["video"],
+      submit,
+    });
+
+    const result = await manager.generateVideoFromBus({
+      prompt: "animate a quiet desk",
+      provider: "agnes",
+      model: "agnes-video-v2.0",
+      delivery: { mode: "response" },
+    });
+
+    expect(providerRegistry.resolveMediaModel).toHaveBeenCalledWith({
+      providerId: "agnes",
+      modelId: "agnes-video-v2.0",
+      capability: "video_generation",
+    });
+    expect(submit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        providerId: "agnes",
+        modelId: "agnes-video-v2.0",
+        protocolId: "agnes-videos",
+        credentialProviderId: "agnes",
+      }),
+      expect.any(Object),
+    );
+    expect(result.tasks).toEqual([{ taskId: "agnes-video-task" }]);
+    expect(manager.getTask("agnes-video-task")).toMatchObject({
+      providerId: "agnes",
+      modelId: "agnes-video-v2.0",
+      protocolId: "agnes-videos",
+      adapterTaskId: "provider-task",
+    });
+
+    manager.stop();
+  });
 });

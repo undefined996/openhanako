@@ -302,6 +302,7 @@ function normalizeUserMediaModels(providerId, userConfig, capabilityName, declar
 // ── 内置插件 ────────────────────────────────────────────────────────────────
 
 import { dashscopePlugin } from "../lib/providers/dashscope.ts";
+import { agnesPlugin } from "../lib/providers/agnes.ts";
 import { openaiPlugin } from "../lib/providers/openai.ts";
 import { anthropicPlugin } from "../lib/providers/anthropic.ts";
 import { deepseekPlugin } from "../lib/providers/deepseek.ts";
@@ -339,6 +340,7 @@ import { kimiCodingPlugin } from "../lib/providers/kimi-coding.ts";
 import { volcegineCodingPlugin } from "../lib/providers/volcengine-coding.ts";
 
 const BUILTIN_PLUGINS = [
+  agnesPlugin,
   dashscopePlugin,
   openaiPlugin,
   anthropicPlugin,
