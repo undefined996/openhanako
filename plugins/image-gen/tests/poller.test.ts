@@ -124,6 +124,34 @@ describe("Poller", () => {
     expect(poller.running).toBe(false);
   });
 
+  it("recovers pending tasks when logger only exposes log instead of info", () => {
+    const task = {
+      taskId: "recovered-task",
+      adapterId: "test-adapter",
+      type: "image",
+      status: "pending",
+      submitState: "submitted",
+      files: [],
+      prompt: "restore me",
+      sessionPath: "/sessions/main.jsonl",
+      createdAt: new Date().toISOString(),
+    };
+    const { poller, log } = makePoller({
+      store: {
+        listPending: vi.fn(() => [task]),
+      },
+    });
+    const fallbackLog = vi.fn();
+    (log as any).info = undefined;
+    (log as any).log = fallbackLog;
+
+    expect(() => poller.start()).not.toThrow();
+    expect(poller.hasPending("recovered-task")).toBe(true);
+    expect(fallbackLog).toHaveBeenCalledWith("[image-gen] poller recovered 1 pending task(s)");
+
+    poller.stop();
+  });
+
   // ── add / hasPending ───────────────────────────────────────────────────────
 
   it("adds a taskId and reports it as pending", () => {
@@ -131,6 +159,41 @@ describe("Poller", () => {
     poller.start();
     poller.add("task1");
     expect(poller.hasPending("task1")).toBe(true);
+    poller.stop();
+  });
+
+  it("cancels a task even when the info logger fails", () => {
+    const task = {
+      taskId: "task1",
+      adapterId: "test-adapter",
+      status: "pending",
+      submitState: "submitted",
+      files: [],
+      createdAt: new Date().toISOString(),
+      sessionPath: "/sessions/main.jsonl",
+    };
+    const { poller, mockStore } = makePoller({
+      store: {
+        get: vi.fn(() => task),
+        update: vi.fn(() => task),
+      },
+      log: {
+        info: vi.fn(() => {
+          throw new Error("logger failed");
+        }),
+      },
+    });
+
+    poller.start();
+    poller.add("task1");
+
+    expect(() => poller.cancel("task1")).not.toThrow();
+    expect(poller.hasPending("task1")).toBe(false);
+    expect(mockStore.update).toHaveBeenCalledWith("task1", expect.objectContaining({
+      status: "cancelled",
+      failReason: "user cancelled",
+    }));
+
     poller.stop();
   });
 

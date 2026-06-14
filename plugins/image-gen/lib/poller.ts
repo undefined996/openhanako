@@ -21,6 +21,29 @@ const TWO_MINUTES = 2 * 60 * 1000;
 const TEN_MINUTES = 10 * 60 * 1000;
 const MAX_CONSECUTIVE_ERRORS = 5;
 
+function callLogger(logger, level, args, fallbackLevel = null) {
+  const fn = typeof logger?.[level] === "function"
+    ? logger[level]
+    : fallbackLevel && typeof logger?.[fallbackLevel] === "function"
+      ? logger[fallbackLevel]
+      : null;
+  if (!fn) return;
+  try {
+    fn.call(logger, ...args);
+  } catch {
+    // Logging must never break media task recovery, cancellation, or polling.
+  }
+}
+
+function createSafeLogger(logger) {
+  return {
+    log: (...args) => callLogger(logger, "log", args, "info"),
+    info: (...args) => callLogger(logger, "info", args, "log"),
+    warn: (...args) => callLogger(logger, "warn", args),
+    error: (...args) => callLogger(logger, "error", args),
+  };
+}
+
 /**
  * Decide whether this tick should trigger a real adapter query for a task.
  *
@@ -64,7 +87,7 @@ export class Poller {
     this._bus          = bus;
     this._dataDir      = dataDir || dirname(generatedDir);
     this._generatedDir = generatedDir;
-    this._log          = log;
+    this._log          = createSafeLogger(log);
     this._registerSessionFile = registerSessionFile || null;
 
     /** @type {Set<string>} taskIds being tracked */
