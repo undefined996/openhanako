@@ -1,7 +1,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   SESSION_MANIFEST_DB_USER_VERSION,
   SessionManifestStore,
@@ -166,5 +166,27 @@ describe("SessionManifestStore", () => {
       completedAt: "2026-06-18T00:01:00.000Z",
       result: { scanned: 1, created: 1, existing: 0, skipped: 0 },
     });
+  });
+
+  it("closes a partially opened database when initialization fails", () => {
+    const dbPath = path.join(tmpDir, "broken-init.db");
+    const close = vi.fn();
+    class FailingDatabase {
+      declare close: () => void;
+
+      constructor(filePath: string) {
+        expect(filePath).toBe(dbPath);
+        this.close = close;
+      }
+
+      pragma() {
+        throw new Error("file is not a database");
+      }
+    }
+
+    expect(() => new SessionManifestStore({ dbPath, Database: FailingDatabase })).toThrow(
+      "file is not a database",
+    );
+    expect(close).toHaveBeenCalledTimes(1);
   });
 });

@@ -118,17 +118,27 @@ export class SessionManifestStore {
     fs.mkdirSync(path.dirname(opts.dbPath), { recursive: true });
     const Database = opts.Database || loadBetterSqliteDatabase();
     this.db = new Database(opts.dbPath);
-    this._now = opts.now || (() => new Date().toISOString());
-    this._idGenerator = opts.idGenerator || (() => generateSessionId());
+    try {
+      this._now = opts.now || (() => new Date().toISOString());
+      this._idGenerator = opts.idGenerator || (() => generateSessionId());
 
-    this.db.pragma("journal_mode = WAL");
-    this.db.pragma("synchronous = NORMAL");
-    this.db.pragma("cache_size = -16000");
-    this.db.pragma("temp_store = MEMORY");
-    this.db.pragma("mmap_size = 30000000");
-    this._initSchema();
-    this._migrate();
-    this._prepareStatements();
+      this.db.pragma("journal_mode = WAL");
+      this.db.pragma("synchronous = NORMAL");
+      this.db.pragma("cache_size = -16000");
+      this.db.pragma("temp_store = MEMORY");
+      this.db.pragma("mmap_size = 30000000");
+      this._initSchema();
+      this._migrate();
+      this._prepareStatements();
+    } catch (error) {
+      try {
+        this.db?.close?.();
+      } catch {
+        // Keep the original initialization error; cleanup failure is secondary.
+      }
+      this.db = null;
+      throw error;
+    }
   }
 
   _initSchema() {

@@ -168,7 +168,15 @@ describe("HanaEngine session manifest startup migration", () => {
     expect(engine.getSessionIdForPath(sessionPath)).toMatch(/^sess_/);
     expect(engine._sessionManifestMigration.status).toBe("completed");
     expect(fs.existsSync(path.join(tmpDir, "session-manifest.db"))).toBe(true);
-    expect(fs.readdirSync(tmpDir).some((name) => name.startsWith("session-manifest.db.quarantine-"))).toBe(true);
-    expect(fs.readdirSync(tmpDir).some((name) => name.startsWith("session-manifest.db-wal.quarantine-"))).toBe(true);
+    const manifestDbNames = fs.readdirSync(tmpDir);
+    expect(manifestDbNames.some((name) => name.startsWith("session-manifest.db.quarantine-"))).toBe(true);
+
+    const activeWalPath = path.join(tmpDir, "session-manifest.db-wal");
+    const activeWalIsOriginalBadSidecar = fs.existsSync(activeWalPath)
+      && fs.readFileSync(activeWalPath, "utf-8") === "bad wal";
+    expect(
+      manifestDbNames.some((name) => name.startsWith("session-manifest.db-wal.quarantine-"))
+      || !activeWalIsOriginalBadSidecar,
+    ).toBe(true);
   });
 });
