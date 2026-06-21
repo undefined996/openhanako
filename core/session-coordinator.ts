@@ -9,6 +9,7 @@ import fs from "fs";
 import fsp from "fs/promises";
 import path from "path";
 import { createAgentSession, SessionManager, estimateTokens, refreshSessionModelFromRegistry } from "../lib/pi-sdk/index.ts";
+import { isSessionJsonlFilename } from "../lib/session-jsonl.ts";
 import { createDefaultSettings } from "./session-defaults.ts";
 import { restoreDefaultWorkspaceIfMissing } from "../shared/default-workspace.ts";
 import { computeHardTruncation } from "./compaction-utils.ts";
@@ -933,7 +934,7 @@ export class SessionCoordinator {
   _sessionPathForEntry(entry: any, fallbackKey: any = null) {
     return entry?.sessionPath
       || entry?.session?.sessionManager?.getSessionFile?.()
-      || (typeof fallbackKey === "string" && fallbackKey.endsWith(".jsonl") ? fallbackKey : null);
+      || (typeof fallbackKey === "string" && isSessionJsonlFilename(path.basename(fallbackKey)) ? fallbackKey : null);
   }
 
   _getSessionEntryByPath(sessionPath: any) {
@@ -3881,7 +3882,7 @@ export class SessionCoordinator {
       try { files = await fsp.readdir(archDir); } catch { return []; }
       const titles = await this._loadSessionTitlesFor(sessionDir).catch(() => ({}));
       const rows = await Promise.all(files
-        .filter((f) => f.endsWith(".jsonl"))
+        .filter(isSessionJsonlFilename)
         .map(async (f) => {
           const full = path.join(archDir, f);
           try {
