@@ -17,6 +17,26 @@ function makeApp(engine) {
   });
 }
 
+async function makeRouteResourceIO({ hanakoHome, workspace, eventBus = {}, studioId = "studio_1" }: Record<string, any>) {
+  const { createSandboxResourceIO } = await import("../lib/resource-io/sandbox-resource-io.ts");
+  return createSandboxResourceIO({
+    cwd: workspace,
+    agentDir: workspace,
+    workspace,
+    workspaceFolders: [workspace],
+    authorizedFolders: [workspace],
+    hanakoHome,
+    getSandboxEnabled: () => false,
+    getSessionPath: () => null,
+    emitEvent: (event: any) => {
+      if (event?.type === "resource.changed") eventBus.changed?.(event);
+      if (event?.type === "resource.renamed") eventBus.renamed?.(event);
+      if (event?.type === "resource.deleted") eventBus.deleted?.(event);
+    },
+    studioId,
+  });
+}
+
 describe("mobile workbench route", () => {
   let tmpDir = null;
 
@@ -328,13 +348,16 @@ describe("mobile workbench route", () => {
     fs.writeFileSync(target, "old", "utf-8");
     const realTarget = fs.realpathSync(target);
     const changed = vi.fn();
+    const resourceIO = await makeRouteResourceIO({
+      hanakoHome: path.join(tmpDir, "hana"),
+      workspace,
+      eventBus: { changed },
+    });
     const app = await makeApp({
       hanakoHome: path.join(tmpDir, "hana"),
       deskCwd: workspace,
       homeCwd: workspace,
-      getResourceIO: () => ({
-        eventBus: { changed },
-      }),
+      getResourceIO: () => resourceIO,
     });
 
     const res = await app.request("/api/workbench/actions", {
@@ -369,13 +392,16 @@ describe("mobile workbench route", () => {
     const changed = vi.fn();
     const renamed = vi.fn();
     const deleted = vi.fn();
+    const resourceIO = await makeRouteResourceIO({
+      hanakoHome,
+      workspace,
+      eventBus: { changed, renamed, deleted },
+    });
     const app = await makeApp({
       hanakoHome,
       deskCwd: workspace,
       homeCwd: workspace,
-      getResourceIO: () => ({
-        eventBus: { changed, renamed, deleted },
-      }),
+      getResourceIO: () => resourceIO,
     });
 
     const mkdir = await app.request("/api/workbench/actions", {

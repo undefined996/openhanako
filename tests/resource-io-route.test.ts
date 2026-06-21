@@ -111,4 +111,75 @@ describe("resource-io route", () => {
     });
     expect(resourceIO.search).toHaveBeenCalledWith({ kind: "local-file", path: "/tmp" }, { query: "hello" });
   });
+
+  it("routes route-grade mutations through engine ResourceIO", async () => {
+    const resourceIO = {
+      writeExpectedVersion: vi.fn(async () => ({ ok: false, conflict: true, version: { size: 5 } })),
+      rename: vi.fn(async () => ({ oldResourceKey: "a", newResourceKey: "b" })),
+      move: vi.fn(async () => ({ oldResourceKey: "b", newResourceKey: "c" })),
+      trash: vi.fn(async () => ({ resourceKey: "c", trashId: "trash_1" })),
+    };
+    const app = new Hono();
+    app.route("/api", createResourceIoRoute({ resourceIO }));
+
+    const writeRes = await app.request("/api/resource-io/write-expected-version", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        resource: { kind: "local-file", path: "/tmp/a.md" },
+        content: "next",
+        expectedVersion: { mtimeMs: 1, size: 5 },
+        reason: "route_test",
+      }),
+    });
+    expect(await writeRes.json()).toEqual({ ok: false, conflict: true, version: { size: 5 } });
+    expect(resourceIO.writeExpectedVersion).toHaveBeenCalledWith(
+      { kind: "local-file", path: "/tmp/a.md" },
+      "next",
+      { mtimeMs: 1, size: 5 },
+      { source: "api", reason: "route_test", sessionPath: null },
+    );
+
+    await app.request("/api/resource-io/rename", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: { kind: "local-file", path: "/tmp/a.md" },
+        to: { kind: "local-file", path: "/tmp/b.md" },
+      }),
+    });
+    expect(resourceIO.rename).toHaveBeenCalledWith(
+      { kind: "local-file", path: "/tmp/a.md" },
+      { kind: "local-file", path: "/tmp/b.md" },
+      { source: "api", reason: "resource_io_route", sessionPath: null },
+    );
+
+    await app.request("/api/resource-io/move", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: { kind: "local-file", path: "/tmp/b.md" },
+        to: { kind: "local-file", path: "/tmp/archive/b.md" },
+      }),
+    });
+    expect(resourceIO.move).toHaveBeenCalledWith(
+      { kind: "local-file", path: "/tmp/b.md" },
+      { kind: "local-file", path: "/tmp/archive/b.md" },
+      { source: "api", reason: "resource_io_route", sessionPath: null },
+    );
+
+    await app.request("/api/resource-io/trash", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        resource: { kind: "local-file", path: "/tmp/archive/b.md" },
+        trash: { namespace: "workbench" },
+      }),
+    });
+    expect(resourceIO.trash).toHaveBeenCalledWith(
+      { kind: "local-file", path: "/tmp/archive/b.md" },
+      { namespace: "workbench" },
+      { source: "api", reason: "resource_io_route", sessionPath: null },
+    );
+  });
 });

@@ -43,3 +43,31 @@ export function crossProviderCopyUnsupported(fromProvider: string, toProvider: s
   err.toProvider = toProvider;
   return err;
 }
+
+export function crossProviderMoveUnsupported(fromProvider: string, toProvider: string): ResourceIOError {
+  const err: any = new ResourceIOError(`ResourceIO cross-provider move is not implemented: ${fromProvider} -> ${toProvider}`, {
+    code: "cross_provider_move_unsupported",
+    status: 501,
+  });
+  err.fromProvider = fromProvider;
+  err.toProvider = toProvider;
+  return err;
+}
+
+export function resourceNotFound(filePath: string): ResourceIOError {
+  const err: any = new ResourceIOError(`ResourceIO resource not found: ${filePath}`, {
+    code: "resource_not_found",
+    status: 404,
+  });
+  err.filePath = filePath;
+  return err;
+}
+
+export function targetAlreadyExists(filePath: string): ResourceIOError {
+  const err: any = new ResourceIOError(`ResourceIO target already exists: ${filePath}`, {
+    code: "target_already_exists",
+    status: 409,
+  });
+  err.filePath = filePath;
+  return err;
+}

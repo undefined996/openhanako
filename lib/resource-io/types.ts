@@ -72,12 +72,16 @@ export type ResourceProviderCapabilities = {
   stat?: boolean;
   read?: boolean;
   write?: boolean;
+  writeExpectedVersion?: boolean;
   edit?: boolean;
   list?: boolean;
   search?: boolean;
   watch?: boolean;
   materialize?: boolean;
   copy?: boolean;
+  rename?: boolean;
+  move?: boolean;
+  trash?: boolean;
   delete?: boolean;
   mkdir?: boolean;
 };
@@ -107,6 +111,42 @@ export type ResourceMutationResult = {
   filePath?: string;
 };
 
+export type ResourceWriteConflictResult = {
+  ok: false;
+  conflict: true;
+  resourceKey: string;
+  resource: ResourceDescriptor;
+  version?: ResourceVersion;
+  filePath?: string;
+};
+
+export type ResourceWriteExpectedVersionResult =
+  | ResourceMutationResult
+  | ResourceWriteConflictResult;
+
+export type ResourceMoveResult = {
+  oldResourceKey: string;
+  newResourceKey: string;
+  oldResource: ResourceDescriptor;
+  newResource: ResourceDescriptor;
+  oldFilePath?: string;
+  newFilePath?: string;
+};
+
+export type ResourceTrashOptions = {
+  namespace?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type ResourceTrashResult = {
+  resourceKey: string;
+  resource: ResourceDescriptor;
+  trashId: string;
+  trashPath?: string;
+  payloadPath?: string;
+  filePath?: string;
+};
+
 export type ResourceEdit = {
   oldText: string;
   newText: string;
@@ -129,6 +169,12 @@ export type ResourceSearchMatch = {
   filePath: string;
   line: number;
   text: string;
+  name?: string;
+  relativePath?: string;
+  parentSubdir?: string;
+  isDirectory?: boolean;
+  size?: number | null;
+  mtimeMs?: number;
 };
 
 export type ResourceSearchResult = {

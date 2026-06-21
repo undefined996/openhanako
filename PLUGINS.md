@@ -253,7 +253,7 @@ export async function execute(input, ctx) {
 }
 ```
 
-`resource.read` 覆盖 `stat`、`read`、`list`；`resource.search` 覆盖搜索；`resource.write` 覆盖 `write`、`edit`、`mkdir`、`delete`、`copy`；`resource.materialize` 用于把资源实体化成本机路径；`resource.watch` 用于解析监听目标。URL resource 保持只读。插件自己生成的文件仍然可以写到 `ctx.dataDir`，再通过 `stageFile()` 返回；用户资源读写不要直接用本地路径和 `fs.writeFileSync`。
+`resource.read` 覆盖 `stat`、`read`、`list`；`resource.search` 覆盖搜索，包括 provider 选项里的文件名搜索；`resource.write` 覆盖 `write`、`writeExpectedVersion`、`edit`、`mkdir`、`delete`、`copy`、`rename`、`move`、`trash`；`resource.materialize` 用于把资源实体化成本机路径；`resource.watch` 用于解析监听目标。URL resource 保持只读。插件自己生成的文件仍然可以写到 `ctx.dataDir`，再通过 `stageFile()` 返回；用户资源读写不要直接用本地路径和 `fs.writeFileSync`。
 
 #### 媒体交付
 

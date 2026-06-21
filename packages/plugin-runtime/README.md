@@ -144,7 +144,9 @@ export const updateNote = defineTool({
 ```
 
 `resource.read` covers `stat`, `read`, and `list`; `resource.search` covers
-search; `resource.write` covers `write`, `edit`, `mkdir`, `delete`, and `copy`;
+search, including filename search through provider options; `resource.write`
+covers `write`, `writeExpectedVersion`, `edit`, `mkdir`, `delete`, `copy`,
+`rename`, `move`, and `trash`;
 `resource.materialize` is required before asking the host for a concrete local
 path; `resource.watch` resolves watch targets. URL resources are read-only.
 Plugin-generated artifacts can still be written under `ctx.dataDir` and returned

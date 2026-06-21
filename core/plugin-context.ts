@@ -336,6 +336,10 @@ function createPluginResources({ pluginId, resourceIO, capabilities, sensitiveCa
       assertCapability("resource.write");
       return getResourceIO().write(ref, content, mutationOptions("write", options));
     },
+    async writeExpectedVersion(ref, content, expectedVersion, options: any = {}) {
+      assertCapability("resource.write");
+      return getResourceIO().writeExpectedVersion(ref, content, expectedVersion, mutationOptions("writeExpectedVersion", options));
+    },
     async edit(ref, edits, options: any = {}) {
       assertCapability("resource.write");
       return getResourceIO().edit(ref, edits, mutationOptions("edit", options));
@@ -351,6 +355,18 @@ function createPluginResources({ pluginId, resourceIO, capabilities, sensitiveCa
     async copy(from, to, options: any = {}) {
       assertCapability("resource.write");
       return getResourceIO().copy(from, to, mutationOptions("copy", options));
+    },
+    async rename(from, to, options: any = {}) {
+      assertCapability("resource.write");
+      return getResourceIO().rename(from, to, mutationOptions("rename", options));
+    },
+    async move(from, to, options: any = {}) {
+      assertCapability("resource.write");
+      return getResourceIO().move(from, to, mutationOptions("move", options));
+    },
+    async trash(ref, trashOptions: any = {}, options: any = {}) {
+      assertCapability("resource.write");
+      return getResourceIO().trash(ref, trashOptions, mutationOptions("trash", options));
     },
     resolveWatchTarget(ref) {
       assertCapability("resource.watch");

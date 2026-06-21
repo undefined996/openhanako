@@ -55,6 +55,7 @@ describe("ResourceIO sandbox file tools", () => {
 
   it("routes write, read, and edit through ResourceIO and emits mutation events", async () => {
     const { workspace, emitEvent, tools } = makeTools();
+    const realWorkspace = fs.realpathSync(workspace);
     const write = tools.find((tool) => tool.name === "write");
     const read = tools.find((tool) => tool.name === "read");
     const edit = tools.find((tool) => tool.name === "edit");
@@ -65,7 +66,7 @@ describe("ResourceIO sandbox file tools", () => {
       type: "resource.changed",
       source: "agent_tool",
       reason: "agent_write",
-      resourceKey: `local_fs:${path.join(workspace, "notes", "a.md").replace(/\\/g, "/")}`,
+      resourceKey: `local_fs:${path.join(realWorkspace, "notes", "a.md").replace(/\\/g, "/")}`,
     }), expect.any(String));
 
     const readResult = await read.execute("read-1", { path: "notes/a.md" });
@@ -80,7 +81,7 @@ describe("ResourceIO sandbox file tools", () => {
       type: "resource.changed",
       source: "agent_tool",
       reason: "agent_edit",
-      resourceKey: `local_fs:${path.join(workspace, "notes", "a.md").replace(/\\/g, "/")}`,
+      resourceKey: `local_fs:${path.join(realWorkspace, "notes", "a.md").replace(/\\/g, "/")}`,
     }), expect.any(String));
   });
 

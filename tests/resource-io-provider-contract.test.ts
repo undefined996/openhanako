@@ -91,4 +91,99 @@ describe("ResourceIO provider contract", () => {
       toProvider: "mount",
     });
   });
+
+  it("dispatches route-grade rename, move, trash, and expected-version writes through providers", async () => {
+    const changed = vi.fn();
+    const renamed = vi.fn();
+    const deleted = vi.fn();
+    const provider = {
+      capabilities: () => ({
+        writeExpectedVersion: true,
+        rename: true,
+        move: true,
+        trash: true,
+      }),
+      writeExpectedVersion: vi.fn(async () => ({
+        ok: false as const,
+        conflict: true as const,
+        resourceKey: "local_fs:/repo/a.md",
+        resource: { kind: "local-file" as const, path: "/repo/a.md", provider: "local_fs" },
+        version: { mtimeMs: 1, size: 3 },
+      })),
+      rename: vi.fn(async () => ({
+        oldResourceKey: "local_fs:/repo/a.md",
+        newResourceKey: "local_fs:/repo/b.md",
+        oldResource: { kind: "local-file" as const, path: "/repo/a.md", provider: "local_fs" },
+        newResource: { kind: "local-file" as const, path: "/repo/b.md", provider: "local_fs" },
+      })),
+      move: vi.fn(async () => ({
+        oldResourceKey: "local_fs:/repo/b.md",
+        newResourceKey: "local_fs:/repo/archive/b.md",
+        oldResource: { kind: "local-file" as const, path: "/repo/b.md", provider: "local_fs" },
+        newResource: { kind: "local-file" as const, path: "/repo/archive/b.md", provider: "local_fs" },
+      })),
+      trash: vi.fn(async () => ({
+        resourceKey: "local_fs:/repo/archive/b.md",
+        resource: { kind: "local-file" as const, path: "/repo/archive/b.md", provider: "local_fs" },
+        trashId: "trash_1",
+        payloadPath: "/trash/payload",
+      })),
+    };
+    const resourceIO = new ResourceIO({
+      providers: { local_fs: provider },
+      eventBus: { changed, renamed, deleted } as any,
+      getSessionPath: () => "/sessions/a.jsonl",
+    });
+
+    const conflict = await resourceIO.writeExpectedVersion(
+      { kind: "local-file", path: "/repo/a.md" },
+      "next",
+      { mtimeMs: 0, size: 3 },
+      { reason: "route_write" },
+    );
+    expect(conflict).toMatchObject({ ok: false, conflict: true });
+    expect(changed).not.toHaveBeenCalled();
+
+    await resourceIO.rename(
+      { kind: "local-file", path: "/repo/a.md" },
+      { kind: "local-file", path: "/repo/b.md" },
+      { reason: "route_rename" },
+    );
+    await resourceIO.move(
+      { kind: "local-file", path: "/repo/b.md" },
+      { kind: "local-file", path: "/repo/archive/b.md" },
+      { reason: "route_move" },
+    );
+    await resourceIO.trash(
+      { kind: "local-file", path: "/repo/archive/b.md" },
+      { namespace: "workbench", metadata: { originalName: "b.md" } },
+      { reason: "route_trash" },
+    );
+
+    expect(provider.writeExpectedVersion).toHaveBeenCalledWith(
+      { kind: "local-file", path: "/repo/a.md" },
+      "next",
+      { mtimeMs: 0, size: 3 },
+    );
+    expect(renamed).toHaveBeenCalledWith(expect.objectContaining({
+      oldResourceKey: "local_fs:/repo/a.md",
+      newResourceKey: "local_fs:/repo/b.md",
+      reason: "route_rename",
+      source: "api",
+      sessionPath: "/sessions/a.jsonl",
+    }));
+    expect(renamed).toHaveBeenCalledWith(expect.objectContaining({
+      oldResourceKey: "local_fs:/repo/b.md",
+      newResourceKey: "local_fs:/repo/archive/b.md",
+      reason: "route_move",
+      source: "api",
+      sessionPath: "/sessions/a.jsonl",
+    }));
+    expect(deleted).toHaveBeenCalledWith(expect.objectContaining({
+      resourceKey: "local_fs:/repo/archive/b.md",
+      reason: "route_trash",
+      source: "api",
+      sessionPath: "/sessions/a.jsonl",
+    }));
+  });
 });

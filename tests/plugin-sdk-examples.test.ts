@@ -60,6 +60,9 @@ describe("plugin SDK examples and docs", () => {
       expect(doc).toContain("ctx.resources");
       expect(doc).toContain("resource.read");
       expect(doc).toContain("resource.write");
+      expect(doc).toContain("writeExpectedVersion");
+      expect(doc).toContain("rename");
+      expect(doc).toContain("trash");
     }
     expect(creatorSkill).toContain("Do not use local path writes for user resources");
   });
@@ -128,6 +131,9 @@ describe("plugin SDK examples and docs", () => {
     expect(runtimeTypes).toContain("HanaProviderMediaMode");
     expect(runtimeTypes).toContain("HanaPluginResources");
     expect(runtimeTypes).toContain("HanaResourceRef");
+    expect(runtimeTypes).toContain("writeExpectedVersion");
+    expect(runtimeTypes).toContain("HanaResourceMoveResult");
+    expect(runtimeTypes).toContain("HanaResourceTrashResult");
     expect(runtimeTypes).toContain("HanaToolSessionPermission");
     expect(runtimeTypes).toContain("sessionPermission");
     expect(runtimeTypes).toContain("resources:");

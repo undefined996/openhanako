@@ -90,7 +90,38 @@ export function createResourceIoRoute(engine) {
     });
   }));
 
+  route.post("/resource-io/write-expected-version", async (c) => resourceJson(c, engine, async (resourceIO, body) => {
+    const resource = body?.resource || body?.ref || body?.target;
+    return resourceIO.writeExpectedVersion(
+      resource,
+      String(body?.content ?? ""),
+      body?.expectedVersion,
+      mutationOptionsFromBody(body),
+    );
+  }));
+
+  route.post("/resource-io/rename", async (c) => resourceJson(c, engine, async (resourceIO, body) => {
+    return resourceIO.rename(body?.from || body?.oldResource, body?.to || body?.newResource, mutationOptionsFromBody(body));
+  }));
+
+  route.post("/resource-io/move", async (c) => resourceJson(c, engine, async (resourceIO, body) => {
+    return resourceIO.move(body?.from || body?.oldResource, body?.to || body?.newResource, mutationOptionsFromBody(body));
+  }));
+
+  route.post("/resource-io/trash", async (c) => resourceJson(c, engine, async (resourceIO, body) => {
+    const resource = body?.resource || body?.ref || body?.target;
+    return resourceIO.trash(resource, body?.trash || {}, mutationOptionsFromBody(body));
+  }));
+
   return route;
+}
+
+function mutationOptionsFromBody(body) {
+  return {
+    source: "api",
+    reason: body?.reason || "resource_io_route",
+    sessionPath: body?.sessionPath || null,
+  };
 }
 
 async function resourceJson(c, engine, handler) {

@@ -1,4 +1,5 @@
 import { LocalFsProvider } from "./providers/local-fs-provider.ts";
+import path from "path";
 import { MountProvider } from "./providers/mount-provider.ts";
 import { ResourceProvider } from "./providers/resource-provider.ts";
 import { SessionFileResolverProvider } from "./providers/session-file-resolver.ts";
@@ -57,7 +58,8 @@ export function createSandboxResourceIO({
     getExternalReadPaths,
   });
 
-  const localFsProviderFactory = ({ cwd: providerCwd, guard }) => new LocalFsProvider({ cwd: providerCwd, guard });
+  const trashRoot = path.join(hanakoHome, "trash");
+  const localFsProviderFactory = ({ cwd: providerCwd, guard }) => new LocalFsProvider({ cwd: providerCwd, guard, trashRoot });
   const providers: Record<string, any> = {
     local_fs: localFsProviderFactory({ cwd, guard: resourceAccessGuard }),
     url: new UrlProvider({ materializeRoot: urlMaterializeRoot }),

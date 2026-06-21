@@ -13,6 +13,11 @@ import type {
   ResourceRef,
   ResourceSearchResult,
   ResourceStat,
+  ResourceTrashOptions,
+  ResourceTrashResult,
+  ResourceVersion,
+  ResourceWriteExpectedVersionResult,
+  ResourceMoveResult,
 } from "../types.ts";
 
 type LocalFsProviderFactory = (options: { cwd: string; guard: { check: (filePath: string, operation: "read" | "write" | "delete") => { allowed: boolean; reason?: string } } }) => any;
@@ -44,12 +49,16 @@ export class MountProvider {
       stat: local && has("read"),
       read: local && has("read"),
       write: local && has("write"),
+      writeExpectedVersion: local && has("write"),
       edit: local && has("write"),
       list: local && has("list"),
       search: local && has("list"),
       watch: local && has("watch"),
       materialize: local && has("materialize"),
       copy: local && has("read") && has("write"),
+      rename: local && has("write"),
+      move: local && has("write"),
+      trash: local && has("write"),
       delete: local && has("write"),
       mkdir: local && has("write"),
     };
@@ -68,6 +77,15 @@ export class MountProvider {
   async write(ref: ResourceRef, content: string | Buffer): Promise<ResourceMutationResult> {
     const resolved = this.resolveLocalMount(ref, "write");
     return this.mapResult(ref, await resolved.provider.write({ kind: "local-file", path: resolved.path }, content));
+  }
+
+  async writeExpectedVersion(ref: ResourceRef, content: string | Buffer, expectedVersion: ResourceVersion): Promise<ResourceWriteExpectedVersionResult> {
+    const resolved = this.resolveLocalMount(ref, "write");
+    return this.mapResult(ref, await resolved.provider.writeExpectedVersion(
+      { kind: "local-file", path: resolved.path },
+      content,
+      expectedVersion,
+    ));
   }
 
   async edit(ref: ResourceRef, edits: ResourceEdit[]): Promise<ResourceMutationResult> {
@@ -136,6 +154,34 @@ export class MountProvider {
     return this.mapResult(to, await target.provider.copy(
       { kind: "local-file", path: source.path },
       { kind: "local-file", path: target.path },
+    ));
+  }
+
+  async rename(from: ResourceRef, to: ResourceRef): Promise<ResourceMoveResult> {
+    assertSameMount(from, to);
+    const source = this.resolveLocalMount(from, "write");
+    const target = this.resolveLocalMount(to, "write");
+    return this.mapMoveResult(from, to, await target.provider.rename(
+      { kind: "local-file", path: source.path },
+      { kind: "local-file", path: target.path },
+    ));
+  }
+
+  async move(from: ResourceRef, to: ResourceRef): Promise<ResourceMoveResult> {
+    assertSameMount(from, to);
+    const source = this.resolveLocalMount(from, "write");
+    const target = this.resolveLocalMount(to, "write");
+    return this.mapMoveResult(from, to, await target.provider.move(
+      { kind: "local-file", path: source.path },
+      { kind: "local-file", path: target.path },
+    ));
+  }
+
+  async trash(ref: ResourceRef, options: ResourceTrashOptions = {}): Promise<ResourceTrashResult> {
+    const resolved = this.resolveLocalMount(ref, "write");
+    return this.mapTrashResult(ref, await resolved.provider.trash(
+      { kind: "local-file", path: resolved.path },
+      options,
     ));
   }
 
@@ -230,6 +276,44 @@ export class MountProvider {
         ...(result.filePath || result.resource?.filePath ? { filePath: result.filePath || result.resource.filePath } : {}),
       } satisfies ResourceDescriptor,
     };
+  }
+
+  mapMoveResult(from: ResourceRef, to: ResourceRef, result: ResourceMoveResult): ResourceMoveResult {
+    if (from.kind !== "mount" || to.kind !== "mount") return result;
+    const oldMountPath = normalizeMountPath(from.path);
+    const newMountPath = normalizeMountPath(to.path);
+    const oldFilePath = result.oldFilePath || result.oldResource?.filePath;
+    const newFilePath = result.newFilePath || result.newResource?.filePath;
+    return {
+      ...result,
+      oldResourceKey: resourceKeyForRef({ kind: "mount", mountId: from.mountId, path: oldMountPath }),
+      newResourceKey: resourceKeyForRef({ kind: "mount", mountId: to.mountId, path: newMountPath }),
+      oldResource: mountResourceForPath(from.mountId, oldMountPath, oldFilePath || ""),
+      newResource: mountResourceForPath(to.mountId, newMountPath, newFilePath || ""),
+      ...(oldFilePath ? { oldFilePath } : {}),
+      ...(newFilePath ? { newFilePath } : {}),
+    };
+  }
+
+  mapTrashResult(ref: ResourceRef, result: ResourceTrashResult): ResourceTrashResult {
+    if (ref.kind !== "mount") return result;
+    const mountPath = normalizeMountPath(ref.path);
+    const filePath = result.filePath || result.resource?.filePath || "";
+    return {
+      ...result,
+      resourceKey: resourceKeyForRef({ kind: "mount", mountId: ref.mountId, path: mountPath }),
+      resource: mountResourceForPath(ref.mountId, mountPath, filePath),
+      ...(filePath ? { filePath } : {}),
+    };
+  }
+}
+
+function assertSameMount(from: ResourceRef, to: ResourceRef): void {
+  if (from.kind !== "mount" || to.kind !== "mount" || from.mountId !== to.mountId) {
+    throw new ResourceIOError("mount move requires the same mount provider", {
+      code: "cross_provider_move_unsupported",
+      status: 501,
+    });
   }
 }
 

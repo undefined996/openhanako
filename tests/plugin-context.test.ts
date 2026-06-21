@@ -97,6 +97,14 @@ describe("createPluginContext", () => {
         content,
         options,
       })),
+      rename: vi.fn(async () => ({
+        oldResourceKey: "local_fs:/workspace/old.md",
+        newResourceKey: "local_fs:/workspace/new.md",
+      })),
+      trash: vi.fn(async () => ({
+        resourceKey: "local_fs:/workspace/new.md",
+        trashId: "trash_1",
+      })),
     };
     const ctx = createPluginContext({
       pluginId: "resource-plugin",
@@ -120,6 +128,36 @@ describe("createPluginContext", () => {
         capability: "resource.write",
       });
     expect(resourceIO.write).not.toHaveBeenCalled();
+
+    const writeCtx = createPluginContext({
+      pluginId: "resource-plugin",
+      pluginDir: "/plugins/resource-plugin",
+      dataDir: "/plugin-data/resource-plugin",
+      bus: { emit() {}, subscribe() {}, request() {}, hasHandler() {} },
+      capabilities: ["resource.write"],
+      resourceIO,
+      runtimeContext: {
+        sessionPath: "/sessions/current.jsonl",
+      },
+    } as any);
+    await writeCtx.resources.rename(
+      { kind: "local-file", path: "/workspace/old.md" },
+      { kind: "local-file", path: "/workspace/new.md" },
+    );
+    await writeCtx.resources.trash(
+      { kind: "local-file", path: "/workspace/new.md" },
+      { namespace: "plugin-test" },
+    );
+    expect(resourceIO.rename).toHaveBeenCalledWith(
+      { kind: "local-file", path: "/workspace/old.md" },
+      { kind: "local-file", path: "/workspace/new.md" },
+      expect.objectContaining({ reason: "plugin:resource-plugin:rename", sessionPath: "/sessions/current.jsonl" }),
+    );
+    expect(resourceIO.trash).toHaveBeenCalledWith(
+      { kind: "local-file", path: "/workspace/new.md" },
+      { namespace: "plugin-test" },
+      expect.objectContaining({ reason: "plugin:resource-plugin:trash", sessionPath: "/sessions/current.jsonl" }),
+    );
   });
 
   it("rejects resource operations when ResourceIO was not injected", async () => {

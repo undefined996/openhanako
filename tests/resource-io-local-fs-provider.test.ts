@@ -15,25 +15,30 @@ describe("LocalFsProvider", () => {
   function makeProvider(check = vi.fn(() => ({ allowed: true }))) {
     tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "hana-resource-local-fs-"));
     const cwd = path.join(tempRoot, "workspace");
+    const trashRoot = path.join(tempRoot, "trash");
     fs.mkdirSync(cwd, { recursive: true });
+    const realCwd = fs.realpathSync(cwd);
     return {
       cwd,
+      realCwd,
+      trashRoot,
       check,
-      provider: new LocalFsProvider({ cwd, guard: { check } }),
+      provider: new LocalFsProvider({ cwd, guard: { check }, trashRoot }),
     };
   }
 
   it("writes and stats a local file through PathGuard", async () => {
-    const { cwd, check, provider } = makeProvider();
+    const { cwd, realCwd, check, provider } = makeProvider();
     const result = await provider.write({ kind: "local-file", path: "notes/a.md" }, "hello");
 
     const target = path.join(cwd, "notes", "a.md");
+    const realTarget = path.join(realCwd, "notes", "a.md");
     expect(fs.readFileSync(target, "utf-8")).toBe("hello");
-    expect(check).toHaveBeenCalledWith(target, "write");
+    expect(check).toHaveBeenCalledWith(realTarget, "write");
     expect(result).toMatchObject({
       changeType: "created",
-      resourceKey: `local_fs:${target.replace(/\\/g, "/")}`,
-      resource: { kind: "local-file", path: target, filePath: target, provider: "local_fs" },
+      resourceKey: `local_fs:${realTarget.replace(/\\/g, "/")}`,
+      resource: { kind: "local-file", path: realTarget, filePath: realTarget, provider: "local_fs" },
       version: { size: 5 },
     });
 
@@ -55,7 +60,7 @@ describe("LocalFsProvider", () => {
   });
 
   it("reads, lists, searches, copies, deletes, and materializes local files", async () => {
-    const { cwd, provider } = makeProvider();
+    const { cwd, realCwd, provider } = makeProvider();
     await provider.write({ kind: "local-file", path: "a.md" }, "alpha");
     await provider.mkdir({ kind: "local-file", path: "nested" });
     await provider.write({ kind: "local-file", path: "nested/b.md" }, "beta alpha");
@@ -67,7 +72,7 @@ describe("LocalFsProvider", () => {
     expect(list.items.map((item) => item.name)).toEqual(expect.arrayContaining(["a.md", "nested"]));
 
     const search = await provider.search({ kind: "local-file", path: "." }, { query: "alpha" });
-    expect(search.matches.map((match) => path.relative(cwd, match.filePath).replace(/\\/g, "/"))).toEqual([
+    expect(search.matches.map((match) => path.relative(realCwd, match.filePath).replace(/\\/g, "/"))).toEqual([
       "a.md",
       "nested/b.md",
     ]);
@@ -80,16 +85,17 @@ describe("LocalFsProvider", () => {
     expect(fs.readFileSync(path.join(cwd, "copy.md"), "utf-8")).toBe("alpha");
 
     const materialized = await provider.materialize({ kind: "local-file", path: "copy.md" });
-    expect(materialized.filePath).toBe(path.join(cwd, "copy.md"));
+    expect(materialized.filePath).toBe(path.join(realCwd, "copy.md"));
 
     const deleted = await provider.delete({ kind: "local-file", path: "copy.md" });
-    expect(deleted.resourceKey).toBe(`local_fs:${path.join(cwd, "copy.md").replace(/\\/g, "/")}`);
+    expect(deleted.resourceKey).toBe(`local_fs:${path.join(realCwd, "copy.md").replace(/\\/g, "/")}`);
     expect(fs.existsSync(path.join(cwd, "copy.md"))).toBe(false);
   });
 
   it("maps relative file watch names back to the watched file", async () => {
-    const { cwd, provider } = makeProvider();
+    const { cwd, realCwd, provider } = makeProvider();
     const filePath = path.join(cwd, "notes", "a.md");
+    const realFilePath = path.join(realCwd, "notes", "a.md");
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, "alpha");
 
@@ -97,14 +103,68 @@ describe("LocalFsProvider", () => {
     const snapshot = target.toResource("a.md");
 
     expect(snapshot).toMatchObject({
-      resourceKey: `local_fs:${filePath.replace(/\\/g, "/")}`,
+      resourceKey: `local_fs:${realFilePath.replace(/\\/g, "/")}`,
       resource: {
         kind: "local-file",
         provider: "local_fs",
-        path: filePath,
-        filePath,
+        path: realFilePath,
+        filePath: realFilePath,
       },
-      filePath,
+      filePath: realFilePath,
     });
+  });
+
+  it("supports expected-version writes, rename, move, and trash as ResourceIO authority operations", async () => {
+    const { cwd, realCwd, trashRoot, provider } = makeProvider();
+    const source = path.join(cwd, "draft.md");
+    fs.writeFileSync(source, "old", "utf-8");
+    const before = fs.statSync(source);
+
+    const stale = await provider.writeExpectedVersion(
+      { kind: "local-file", path: "draft.md" },
+      "stale overwrite",
+      { mtimeMs: before.mtimeMs - 1, size: before.size },
+    );
+    expect(stale).toMatchObject({
+      ok: false,
+      conflict: true,
+      version: { size: before.size },
+    });
+    expect(fs.readFileSync(source, "utf-8")).toBe("old");
+
+    const saved = await provider.writeExpectedVersion(
+      { kind: "local-file", path: "draft.md" },
+      "new",
+      { mtimeMs: before.mtime.getTime(), size: before.size },
+    );
+    expect(saved).toMatchObject({ changeType: "modified", version: { size: 3 } });
+
+    const rename = await provider.rename(
+      { kind: "local-file", path: "draft.md" },
+      { kind: "local-file", path: "renamed.md" },
+    );
+    expect(rename).toMatchObject({
+      oldResource: { filePath: path.join(realCwd, "draft.md") },
+      newResource: { filePath: path.join(realCwd, "renamed.md") },
+    });
+    expect(fs.existsSync(path.join(cwd, "draft.md"))).toBe(false);
+
+    const move = await provider.move(
+      { kind: "local-file", path: "renamed.md" },
+      { kind: "local-file", path: "archive/renamed.md" },
+    );
+    expect(move.newResource).toMatchObject({ filePath: path.join(realCwd, "archive", "renamed.md") });
+    expect(fs.readFileSync(path.join(cwd, "archive", "renamed.md"), "utf-8")).toBe("new");
+
+    const trashed = await provider.trash(
+      { kind: "local-file", path: "archive/renamed.md" },
+      { namespace: "mobile-workbench", metadata: { originalName: "renamed.md", rootId: "default" } },
+    );
+    expect(trashed.trashId).toMatch(/^trash_/);
+    expect(trashed.payloadPath).toBe(path.join(trashRoot, "mobile-workbench", trashed.trashId, "payload"));
+    expect(fs.readFileSync(trashed.payloadPath!, "utf-8")).toBe("new");
+    expect(JSON.parse(fs.readFileSync(path.join(trashRoot, "mobile-workbench", trashed.trashId, "metadata.json"), "utf-8")))
+      .toMatchObject({ originalName: "renamed.md", rootId: "default" });
+    expect(fs.existsSync(path.join(cwd, "archive", "renamed.md"))).toBe(false);
   });
 });

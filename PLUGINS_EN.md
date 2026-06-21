@@ -211,7 +211,7 @@ export async function execute(input, ctx) {
 }
 ```
 
-`resource.read` covers `stat`, `read`, and `list`; `resource.search` covers search; `resource.write` covers `write`, `edit`, `mkdir`, `delete`, and `copy`; `resource.materialize` is for turning a resource into a concrete local path; `resource.watch` resolves watch targets. URL resources stay read-only. Plugin-generated artifacts may still be written under `ctx.dataDir` and returned with `stageFile()`, but user resource reads and writes should not use raw local paths or `fs.writeFileSync`.
+`resource.read` covers `stat`, `read`, and `list`; `resource.search` covers search, including filename search through provider options; `resource.write` covers `write`, `writeExpectedVersion`, `edit`, `mkdir`, `delete`, `copy`, `rename`, `move`, and `trash`; `resource.materialize` is for turning a resource into a concrete local path; `resource.watch` resolves watch targets. URL resources stay read-only. Plugin-generated artifacts may still be written under `ctx.dataDir` and returned with `stageFile()`, but user resource reads and writes should not use raw local paths or `fs.writeFileSync`.
 
 #### Media Delivery
 

@@ -203,7 +203,7 @@ export async function execute(input, ctx) {
 }
 ```
 
-`resource.read` covers `stat`, `read`, and `list`; `resource.search` covers search; `resource.write` covers `write`, `edit`, `mkdir`, `delete`, and `copy`; `resource.materialize` is required before asking the host for a concrete local path; `resource.watch` covers watch-target resolution. URL resources are read-only and write attempts fail at the provider boundary. Plugin-generated artifacts may still be written under `ctx.dataDir` and returned with `stageFile()`, but user resource edits should not use raw local path writes.
+`resource.read` covers `stat`, `read`, and `list`; `resource.search` covers search, including filename search with provider options; `resource.write` covers `write`, `writeExpectedVersion`, `edit`, `mkdir`, `delete`, `copy`, `rename`, `move`, and `trash`; `resource.materialize` is required before asking the host for a concrete local path; `resource.watch` covers watch-target resolution. URL resources are read-only and write attempts fail at the provider boundary. Plugin-generated artifacts may still be written under `ctx.dataDir` and returned with `stageFile()`, but user resource edits should not use raw local path writes.
 
 Scheduled automation plugin actions reuse plugin tools in v0. A cron executor saved as `plugin_action` with `{ pluginId, actionId, params }` maps to the loaded tool named `pluginId_actionId`. The scheduler stores only JSON data and invokes the tool at runtime; plugin-authored static `tools/*.js` tools and dynamic `ctx.registerTool()` tools both receive the SDK-style `(input, ctx)` call. If the plugin or tool is unavailable, the run fails explicitly and is recorded in cron history.
 

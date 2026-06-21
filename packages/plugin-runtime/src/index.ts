@@ -129,6 +129,42 @@ export interface HanaResourceMutationResult {
   filePath?: string;
 }
 
+export interface HanaResourceWriteConflictResult {
+  ok: false;
+  conflict: true;
+  resourceKey: string;
+  resource: HanaResourceDescriptor;
+  version?: HanaResourceVersion;
+  filePath?: string;
+}
+
+export type HanaResourceWriteExpectedVersionResult =
+  | HanaResourceMutationResult
+  | HanaResourceWriteConflictResult;
+
+export interface HanaResourceMoveResult {
+  oldResourceKey: string;
+  newResourceKey: string;
+  oldResource: HanaResourceDescriptor;
+  newResource: HanaResourceDescriptor;
+  oldFilePath?: string;
+  newFilePath?: string;
+}
+
+export interface HanaResourceTrashOptions {
+  namespace?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface HanaResourceTrashResult {
+  resourceKey: string;
+  resource: HanaResourceDescriptor;
+  trashId: string;
+  trashPath?: string;
+  payloadPath?: string;
+  filePath?: string;
+}
+
 export interface HanaResourceEdit {
   oldText: string;
   newText: string;
@@ -156,6 +192,12 @@ export interface HanaResourceSearchMatch {
   filePath: string;
   line: number;
   text: string;
+  name?: string;
+  relativePath?: string;
+  parentSubdir?: string;
+  isDirectory?: boolean;
+  size?: number | null;
+  mtimeMs?: number;
 }
 
 export interface HanaResourceSearchResult {
@@ -190,10 +232,14 @@ export interface HanaPluginResources {
   search(ref: HanaResourceRef | Record<string, unknown>, options?: HanaResourceSearchOptions): Promise<HanaResourceSearchResult>;
   materialize(ref: HanaResourceRef | Record<string, unknown>): Promise<HanaResourceMaterializeResult>;
   write(ref: HanaResourceRef | Record<string, unknown>, content: string | Uint8Array | ArrayBuffer, options?: HanaPluginResourceMutationOptions): Promise<HanaResourceMutationResult>;
+  writeExpectedVersion(ref: HanaResourceRef | Record<string, unknown>, content: string | Uint8Array | ArrayBuffer, expectedVersion: HanaResourceVersion, options?: HanaPluginResourceMutationOptions): Promise<HanaResourceWriteExpectedVersionResult>;
   edit(ref: HanaResourceRef | Record<string, unknown>, edits: HanaResourceEdit[], options?: HanaPluginResourceMutationOptions): Promise<HanaResourceMutationResult>;
   mkdir(ref: HanaResourceRef | Record<string, unknown>, options?: HanaPluginResourceMutationOptions): Promise<HanaResourceMutationResult>;
   delete(ref: HanaResourceRef | Record<string, unknown>, options?: HanaPluginResourceMutationOptions): Promise<HanaResourceMutationResult>;
   copy(from: HanaResourceRef | Record<string, unknown>, to: HanaResourceRef | Record<string, unknown>, options?: HanaPluginResourceMutationOptions): Promise<HanaResourceMutationResult>;
+  rename(from: HanaResourceRef | Record<string, unknown>, to: HanaResourceRef | Record<string, unknown>, options?: HanaPluginResourceMutationOptions): Promise<HanaResourceMoveResult>;
+  move(from: HanaResourceRef | Record<string, unknown>, to: HanaResourceRef | Record<string, unknown>, options?: HanaPluginResourceMutationOptions): Promise<HanaResourceMoveResult>;
+  trash(ref: HanaResourceRef | Record<string, unknown>, trashOptions?: HanaResourceTrashOptions, options?: HanaPluginResourceMutationOptions): Promise<HanaResourceTrashResult>;
   resolveWatchTarget?(ref: HanaResourceRef | Record<string, unknown>): HanaResourceWatchTarget;
 }
 

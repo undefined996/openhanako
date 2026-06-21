@@ -1,17 +1,23 @@
 import type { ResourceEventBus } from "./resource-event-bus.ts";
-import { capabilityDenied, crossProviderCopyUnsupported, providerNotAvailable } from "./errors.ts";
+import { capabilityDenied, crossProviderCopyUnsupported, crossProviderMoveUnsupported, providerNotAvailable } from "./errors.ts";
 import { normalizeResourceRef } from "./resource-refs.ts";
 import type {
   MaterializeResult,
   ResourceDeletedEvent,
   ResourceEdit,
   ResourceEventSource,
+  ResourceListResult,
   ResourceMutationResult,
+  ResourceMoveResult,
   ResourceReadResult,
   ResourceRef,
   ResourceSearchResult,
   ResourceStat,
-  ResourceListResult,
+  ResourceTrashOptions,
+  ResourceTrashResult,
+  ResourceVersion,
+  ResourceWriteConflictResult,
+  ResourceWriteExpectedVersionResult,
 } from "./types.ts";
 
 type Provider = {
@@ -27,6 +33,7 @@ type Provider = {
   stat?: (ref: ResourceRef) => Promise<ResourceStat>;
   read?: (ref: ResourceRef) => Promise<ResourceReadResult>;
   write?: (ref: ResourceRef, content: string | Buffer) => Promise<ResourceMutationResult>;
+  writeExpectedVersion?: (ref: ResourceRef, content: string | Buffer, expectedVersion: ResourceVersion) => Promise<ResourceWriteExpectedVersionResult>;
   edit?: (ref: ResourceRef, edits: ResourceEdit[]) => Promise<ResourceMutationResult>;
   mkdir?: (ref: ResourceRef) => Promise<ResourceMutationResult>;
   delete?: (ref: ResourceRef) => Promise<ResourceMutationResult>;
@@ -34,6 +41,9 @@ type Provider = {
   search?: (ref: ResourceRef, options?: Record<string, unknown>) => Promise<ResourceSearchResult>;
   materialize?: (ref: ResourceRef) => Promise<MaterializeResult>;
   copy?: (from: ResourceRef, to: ResourceRef) => Promise<ResourceMutationResult>;
+  rename?: (from: ResourceRef, to: ResourceRef) => Promise<ResourceMoveResult>;
+  move?: (from: ResourceRef, to: ResourceRef) => Promise<ResourceMoveResult>;
+  trash?: (ref: ResourceRef, options?: ResourceTrashOptions) => Promise<ResourceTrashResult>;
 };
 
 type ResourceIOOptions = {
@@ -74,6 +84,13 @@ export class ResourceIO {
     const ref = normalizeResourceRef(input);
     const result = await this.callProvider<ResourceMutationResult>(ref, "write", ref, content);
     this.emitChanged(result, options);
+    return result;
+  }
+
+  async writeExpectedVersion(input: unknown, content: string | Buffer, expectedVersion: ResourceVersion, options: MutationOptions = {}): Promise<ResourceWriteExpectedVersionResult> {
+    const ref = normalizeResourceRef(input);
+    const result = await this.callProvider<ResourceWriteExpectedVersionResult>(ref, "writeExpectedVersion", ref, content, expectedVersion);
+    if (!isWriteConflict(result)) this.emitChanged(result, options);
     return result;
   }
 
@@ -141,6 +158,32 @@ export class ResourceIO {
     return result;
   }
 
+  async rename(from: unknown, to: unknown, options: MutationOptions = {}): Promise<ResourceMoveResult> {
+    return this.moveLike("rename", from, to, options);
+  }
+
+  async move(from: unknown, to: unknown, options: MutationOptions = {}): Promise<ResourceMoveResult> {
+    return this.moveLike("move", from, to, options);
+  }
+
+  async trash(input: unknown, trashOptions: ResourceTrashOptions = {}, options: MutationOptions = {}): Promise<ResourceTrashResult> {
+    const ref = normalizeResourceRef(input);
+    const result = await this.callProvider<ResourceTrashResult>(ref, "trash", ref, trashOptions);
+    this.emitDeletedResult(result, options);
+    return result;
+  }
+
+  async moveLike(capability: "rename" | "move", from: unknown, to: unknown, options: MutationOptions = {}): Promise<ResourceMoveResult> {
+    const fromRef = normalizeResourceRef(from);
+    const toRef = normalizeResourceRef(to);
+    if (providerIdForRef(fromRef) !== providerIdForRef(toRef)) {
+      throw crossProviderMoveUnsupported(providerIdForRef(fromRef), providerIdForRef(toRef));
+    }
+    const result = await this.callProvider<ResourceMoveResult>(toRef, capability, fromRef, toRef);
+    this.emitRenamed(result, options);
+    return result;
+  }
+
   providerFor(ref: ResourceRef): Provider {
     const id = providerIdForRef(ref);
     const provider = this.providers[id];
@@ -169,6 +212,34 @@ export class ResourceIO {
       sessionPath: options.sessionPath ?? this.getSessionPath?.() ?? null,
     });
   }
+
+  emitDeletedResult(result: ResourceTrashResult | ResourceMutationResult, options: MutationOptions): void {
+    if (options.emit === false || !this.eventBus) return;
+    this.eventBus.deleted({
+      resourceKey: result.resourceKey,
+      resource: result.resource,
+      source: options.source || "api",
+      reason: options.reason,
+      sessionPath: options.sessionPath ?? this.getSessionPath?.() ?? null,
+    } as any);
+  }
+
+  emitRenamed(result: ResourceMoveResult, options: MutationOptions): void {
+    if (options.emit === false || !this.eventBus) return;
+    this.eventBus.renamed({
+      oldResourceKey: result.oldResourceKey,
+      newResourceKey: result.newResourceKey,
+      oldResource: result.oldResource,
+      newResource: result.newResource,
+      source: options.source || "api",
+      reason: options.reason,
+      sessionPath: options.sessionPath ?? this.getSessionPath?.() ?? null,
+    } as any);
+  }
+}
+
+function isWriteConflict(result: ResourceWriteExpectedVersionResult): result is ResourceWriteConflictResult {
+  return Boolean((result as any)?.ok === false && (result as any)?.conflict === true);
 }
 
 function providerIdForRef(ref: ResourceRef): string {
