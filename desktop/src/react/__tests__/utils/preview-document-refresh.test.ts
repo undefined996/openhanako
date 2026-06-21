@@ -228,6 +228,26 @@ describe('preview document refresh', () => {
     );
   });
 
+  it('builds mount ResourceRefs for mounted workbench preview documents', async () => {
+    const openRemote = remoteRef('note.md', 'mount_docs');
+    useStore.setState({
+      deskBasePath: 'studio:mount_docs',
+      deskWorkspaceMountId: 'mount_docs',
+      deskWorkspaceNativeRoot: '/Users/me/Documents',
+      previewItems: [
+        remoteItem('open-remote', openRemote),
+      ],
+      openTabs: ['open-remote'],
+    } as Partial<StoreState>);
+    const {
+      openPreviewDocumentWatchResources,
+    } = await import('../../utils/preview-document-refresh');
+
+    expect(openPreviewDocumentWatchResources().map(item => item.ref)).toEqual([
+      { kind: 'mount', mountId: 'mount_docs', path: 'notes/note.md' },
+    ]);
+  });
+
   it('refreshes matching open documents from a ResourceIO local change event', async () => {
     useStore.setState({
       previewItems: [
