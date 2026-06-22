@@ -23,12 +23,12 @@ import { buildCoverStyleGuideForAgent } from "../../plugins/beautify/lib/cover-s
 import { createSubmitContext, validateImageModelRef } from "../../plugins/image-gen/lib/image-task-runner.ts";
 import { DEFAULT_ACTIVITY_EXECUTION_TIMEOUT_MS, activityTimeoutPatch } from "../../lib/desk/activity-store.ts";
 import { t } from "../../lib/i18n.ts";
-import { resourceKeyForRef } from "../../lib/resource-io/resource-refs.ts";
 import { realPath, isSensitivePath } from "../utils/path-security.ts";
 import { readAuthPrincipal } from "../http/capability-guard.ts";
 import { jsonRouteError } from "../http/route-errors.ts";
 import { isLocalOwnerPrincipal } from "../http/route-security.ts";
 import { createRequestContext } from "../http/boundary.ts";
+import { createApiResourceOperationContext, requestIdFromHono } from "../http/resource-operation-context.ts";
 import { MountAwareFileError, MountAwareFileService } from "../../core/mount-aware-file-service.ts";
 import { materializeUploadedSkillPackage } from "../utils/uploaded-skill-package.ts";
 
@@ -399,6 +399,10 @@ export function createDeskRoute(engine, hub) {
         ? (args) => engine.createUserEditCheckpoint(args)
         : null,
       resourceIO: resourceIOForEngine(engine),
+      operationContext: createApiResourceOperationContext({
+        requestContext,
+        requestId: requestIdFromHono(c),
+      }),
     });
   }
 
@@ -542,29 +546,6 @@ export function createDeskRoute(engine, hub) {
     return err;
   }
 
-  function emitMarkdownCoverResourceChanged(targetInfo) {
-    const filePath = targetInfo?.filePath;
-    if (typeof filePath !== "string" || !filePath) return;
-    const stat = fs.statSync(filePath);
-    engine.emitResourceChanged({
-      changeType: "modified",
-      resourceKey: resourceKeyForRef({ kind: "local-file", path: filePath }),
-      resource: {
-        kind: "local-file",
-        provider: "local_fs",
-        path: filePath,
-        filePath,
-        ...(targetInfo.target ? { target: targetInfo.target } : {}),
-      },
-      version: {
-        mtimeMs: stat.mtimeMs,
-        size: stat.size,
-      },
-      source: "api",
-      reason: "markdown_cover",
-    });
-  }
-
   async function validateBeautifyGenerationAccess(body) {
     const status = await getBeautifyGenerationStatus(body?.executorAgentId || body?.agentId);
     if (!status.executorAgentId) return { error: "agent unavailable", status: 500, reason: "agent-unavailable" };
@@ -613,8 +594,13 @@ export function createDeskRoute(engine, hub) {
       const result = await (applyMarkdownCoverFromGeneratedFile as any)({
         markdownFilePath: targetInfo.filePath,
         generatedFilePath: image.filePath,
+        resourceIO: resourceIOForEngine(engine),
+        operationContext: createApiResourceOperationContext({
+          requestContext: createRequestContext(c, engine),
+          requestId: requestIdFromHono(c),
+          reason: "desk.beautify.cover.apply",
+        }),
       });
-      emitMarkdownCoverResourceChanged(targetInfo);
       return c.json({
         ok: true,
         ...(targetInfo.target ? { target: targetInfo.target } : {}),
@@ -648,8 +634,13 @@ export function createDeskRoute(engine, hub) {
       const result = await (applyMarkdownCoverFromGeneratedFile as any)({
         markdownFilePath: targetInfo.filePath,
         generatedFilePath: imageFilePath,
+        resourceIO: resourceIOForEngine(engine),
+        operationContext: createApiResourceOperationContext({
+          requestContext: createRequestContext(c, engine),
+          requestId: requestIdFromHono(c),
+          reason: "desk.beautify.cover.preset_apply",
+        }),
       });
-      emitMarkdownCoverResourceChanged(targetInfo);
       return c.json({
         ok: true,
         ...(targetInfo.target ? { target: targetInfo.target } : {}),

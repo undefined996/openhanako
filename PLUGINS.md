@@ -651,6 +651,7 @@ hana.ui.resize({ height: 320 });
 await hana.toast.show({ message: '已刷新', type: 'success' });
 await hana.external.open('https://example.com');
 await hana.clipboard.writeText('复制内容');
+await hana.resources.open({ resource: { kind: 'session-file', fileId: 'sf_1' }, mode: 'preview' });
 ```
 
 底层仍保留 `hana.host.request(type, payload)`，用于未来 capability 或实验能力；稳定能力优先使用 typed helper。
@@ -661,7 +662,7 @@ await hana.clipboard.writeText('复制内容');
 window.parent.postMessage({ type: 'ready' }, '*');
 ```
 
-宿主只接受来自当前 iframe window 且 origin 匹配的消息。SDK 请求会经过 capability registry；当前内置能力包括 `toast.show`（无需授权）、`external.open`（需要授权）和 `clipboard.writeText`（需要授权）。
+宿主只接受来自当前 iframe window 且 origin 匹配的消息。SDK 请求会经过 capability registry；当前内置能力包括 `toast.show`（无需授权）、`external.open`（需要授权）、`clipboard.writeText`（需要授权）以及资源请求类 `resource.open`、`resource.pick`、`resource.requestAccess`（均需要授权）。
 
 需要授权的 iframe 宿主能力必须在 manifest 中声明：
 
@@ -669,12 +670,14 @@ window.parent.postMessage({ type: 'ready' }, '*');
 {
   "manifestVersion": 1,
   "ui": {
-    "hostCapabilities": ["external.open", "clipboard.writeText"]
+    "hostCapabilities": ["external.open", "clipboard.writeText", "resource.open"]
   }
 }
 ```
 
 未声明的敏感能力会返回 `CAPABILITY_DENIED`。未知能力名会在加载时被忽略；`toast.show` 不需要声明。
+
+`hana.resources.*` 只是在 iframe 中向宿主发请求：可以请求打开资源、选择资源、申请访问权限，但不能直接读取或写入文件内容。真正的用户资源读写仍然放在插件服务端 route、tool 或 lifecycle 里，通过 `ctx.resources` 进入 ResourceIO。
 
 宿主会在 iframe URL 上附加 `hana-theme` 和 `hana-css` 参数，插件可选择引用主题 CSS 以保持视觉一致：
 

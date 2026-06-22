@@ -149,8 +149,10 @@ covers `write`, `writeExpectedVersion`, `edit`, `mkdir`, `delete`, `copy`,
 `rename`, `move`, and `trash`;
 `resource.materialize` is required before asking the host for a concrete local
 path; `resource.watch` resolves watch targets. URL resources are read-only.
-Plugin-generated artifacts can still be written under `ctx.dataDir` and returned
-with `stageFile()`, but user resource edits should go through `ctx.resources`.
+Resource mutations run with `principal.kind = "plugin"` and the current plugin id
+so ResourceIO audit logs can identify the source. Plugin-generated artifacts can
+still be written under `ctx.dataDir` and returned with `stageFile()`, but user
+resource edits should go through `ctx.resources`.
 
 ## Tool session permissions
 

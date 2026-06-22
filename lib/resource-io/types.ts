@@ -23,6 +23,7 @@ export type ResourceEventSource =
   | "agent_tool"
   | "provider_watch"
   | "api"
+  | "plugin"
   | "bash_reconcile"
   | "mount"
   | "session_file"
@@ -67,6 +68,18 @@ export type ResourceEvent =
   | ResourceChangedEvent
   | ResourceDeletedEvent
   | ResourceRenamedEvent;
+
+export type ResourceEventCatchUpResult =
+  | {
+    stale: false;
+    latestSequence: number;
+    events: ResourceEvent[];
+  }
+  | {
+    stale: true;
+    latestSequence: number;
+    events: [];
+  };
 
 export type ResourceProviderCapabilities = {
   stat?: boolean;
@@ -239,4 +252,51 @@ export type ResourceProvider = {
   rename?: (from: ResourceRef, to: ResourceRef) => Promise<ResourceMoveResult>;
   move?: (from: ResourceRef, to: ResourceRef) => Promise<ResourceMoveResult>;
   trash?: (ref: ResourceRef, options?: ResourceTrashOptions) => Promise<ResourceTrashResult>;
+};
+
+export type ResourcePrincipal = {
+  kind: "agent" | "plugin" | "api" | "watch" | "system";
+  userId?: string | null;
+  studioId?: string | null;
+  sessionId?: string | null;
+  sessionPath?: string | null;
+  pluginId?: string | null;
+  connectionKind?: string | null;
+  credentialKind?: string | null;
+  requestId?: string | null;
+};
+
+export type ResourceOperationContext = {
+  source?: ResourceEventSource;
+  reason?: string;
+  principal?: ResourcePrincipal;
+  sessionId?: string | null;
+  sessionPath?: string | null;
+  requestId?: string | null;
+  emit?: boolean;
+  auditRead?: boolean;
+};
+
+export type ResourceAuditOutcome = "allowed" | "denied" | "conflict";
+
+export type ResourceAuditEvent = {
+  type: "resource.audit";
+  outcome: ResourceAuditOutcome;
+  operation: ResourceProviderCapability;
+  providerId?: ResourceProviderId;
+  resourceKey?: string;
+  resource?: ResourceDescriptor;
+  principal?: ResourcePrincipal;
+  reason?: string;
+  code?: string;
+  safeMessage?: string;
+  sessionId?: string | null;
+  sessionPath?: string | null;
+  requestId?: string | null;
+  sequence: number;
+  occurredAt: string;
+};
+
+export type ResourceAuditSink = {
+  record(event: Omit<ResourceAuditEvent, "type" | "sequence" | "occurredAt">): ResourceAuditEvent | void;
 };

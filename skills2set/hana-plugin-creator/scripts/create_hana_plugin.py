@@ -140,13 +140,12 @@ def required_sdk_packages(include_tool: bool, include_ui: bool, include_lifecycl
         return []
     packages: list[str] = []
     if include_tool or include_lifecycle:
+        packages.append("@hana/plugin-protocol")
         packages.append("@hana/plugin-runtime")
     if include_ui:
-        packages.extend([
-            "@hana/plugin-protocol",
-            "@hana/plugin-sdk",
-            "@hana/plugin-components",
-        ])
+        if "@hana/plugin-protocol" not in packages:
+            packages.append("@hana/plugin-protocol")
+        packages.extend(["@hana/plugin-sdk", "@hana/plugin-components"])
     return packages
 
 
@@ -705,6 +704,11 @@ const hana = {{
   toast: {{ show: (input) => request("toast.show", input) }},
   external: {{ open: (url) => request("external.open", typeof url === "string" ? {{ url }} : url) }},
   clipboard: {{ writeText: (text) => request("clipboard.writeText", typeof text === "string" ? {{ text }} : text) }},
+  resources: {{
+    open: (input) => request("resource.open", input),
+    pick: (input = {{}}) => request("resource.pick", input),
+    requestAccess: (input) => request("resource.requestAccess", input),
+  }},
   theme: {{
     getSnapshot: () => {{
       const params = new URLSearchParams(window.location.search);

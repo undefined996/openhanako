@@ -80,6 +80,12 @@ describe("ResourceIO agent tools", () => {
       cwd: tmpDir,
       resourceIO: resourceIO as any,
       getSessionPath: () => "/sessions/a.jsonl",
+      getSessionIdentity: () => ({
+        sessionId: "sess_1",
+        sessionPath: "/sessions/a.jsonl",
+        userId: "user_1",
+        studioId: "studio_1",
+      }),
     });
     const filePath = path.join(tmpDir, "notes", "a.md");
 
@@ -92,6 +98,14 @@ describe("ResourceIO agent tools", () => {
         source: "agent_tool",
         reason: "agent_write",
         sessionPath: "/sessions/a.jsonl",
+        sessionId: "sess_1",
+        principal: expect.objectContaining({
+          kind: "agent",
+          sessionId: "sess_1",
+          sessionPath: "/sessions/a.jsonl",
+          userId: "user_1",
+          studioId: "studio_1",
+        }),
       }),
     );
   });

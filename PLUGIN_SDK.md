@@ -85,6 +85,7 @@ import { hana } from '@hana/plugin-sdk';
 hana.ready();
 hana.ui.resize({ height: 320 });
 await hana.toast.show({ message: 'Ready' });
+await hana.resources.open({ resource: { kind: 'session-file', fileId: 'sf_1' }, mode: 'preview' });
 ```
 
 Use `hana.api.fetch(path, init)` for browser-side calls to this plugin's own dynamic route handlers. It derives the current plugin id from the iframe route and sends the `X-Hana-Plugin-Surface-Session` header that Hana issued with the iframe URL:
@@ -100,6 +101,8 @@ const res = await hana.api.fetch('api/translate', {
 Website-to-plugin conversions should rewrite same-plugin `fetch('/api/...')` calls to `hana.api.fetch(...)`. Do not hard-code `/api/plugins/{pluginId}/...` in browser code, and do not reuse `pluginIframeTicket` for XHR/fetch calls; that ticket is only for the iframe document load.
 
 Browser-side code should not call third-party APIs directly. If a plugin needs live data from the public internet, call a same-plugin route with `hana.api.fetch(...)`; the route should use the runtime `ctx.network.fetch()` helper described below. This keeps API keys out of iframe assets and lets Hana diagnose missing host, method, timeout, and response-size declarations.
+
+Browser-side resource helpers are host-mediated only: `hana.resources.open()`, `hana.resources.pick()`, and `hana.resources.requestAccess()` can ask Hana to open, choose, or grant access to a resource, but they do not expose filesystem reads or writes inside the iframe. Actual user-resource reads and writes belong in server-side plugin code through `ctx.resources`.
 
 Use `hana.assets.url(path)` for browser-side references to files bundled under the plugin's `assets/` directory:
 
@@ -203,7 +206,7 @@ export async function execute(input, ctx) {
 }
 ```
 
-`resource.read` covers `stat`, `read`, and `list`; `resource.search` covers search, including filename search with provider options; `resource.write` covers `write`, `writeExpectedVersion`, `edit`, `mkdir`, `delete`, `copy`, `rename`, `move`, and `trash`; `resource.materialize` is required before asking the host for a concrete local path; `resource.watch` covers watch-target resolution. URL resources are read-only and write attempts fail at the provider boundary. Plugin-generated artifacts may still be written under `ctx.dataDir` and returned with `stageFile()`, but user resource edits should not use raw local path writes.
+`resource.read` covers `stat`, `read`, and `list`; `resource.search` covers search, including filename search with provider options; `resource.write` covers `write`, `writeExpectedVersion`, `edit`, `mkdir`, `delete`, `copy`, `rename`, `move`, and `trash`; `resource.materialize` is required before asking the host for a concrete local path; `resource.watch` covers watch-target resolution. URL resources are read-only and write attempts fail at the provider boundary. Plugin ResourceIO mutations run with `principal.kind = "plugin"` so audit logs and resource events can identify the plugin source. Plugin-generated artifacts may still be written under `ctx.dataDir` and returned with `stageFile()`, but user resource edits should not use raw local path writes.
 
 Scheduled automation plugin actions reuse plugin tools in v0. A cron executor saved as `plugin_action` with `{ pluginId, actionId, params }` maps to the loaded tool named `pluginId_actionId`. The scheduler stores only JSON data and invokes the tool at runtime; plugin-authored static `tools/*.js` tools and dynamic `ctx.registerTool()` tools both receive the SDK-style `(input, ctx)` call. If the plugin or tool is unavailable, the run fails explicitly and is recorded in cron history.
 

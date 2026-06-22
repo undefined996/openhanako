@@ -20,6 +20,7 @@ export function createPluginContext({ pluginId, pluginKey, source, pluginDir, da
     executionBoundary: clonePlain(runtimeContext.executionBoundary),
     sessionId: textOrNull(runtimeContext.sessionId),
     sessionPath: textOrNull(runtimeContext.sessionPath),
+    requestId: textOrNull(runtimeContext.requestId),
     sessionRef: normalizeSessionRef(runtimeContext.sessionRef, runtimeContext),
   } : {};
 
@@ -304,12 +305,30 @@ function createPluginResources({ pluginId, resourceIO, capabilities, sensitiveCa
       { pluginId, capability },
     );
   };
-  const mutationOptions = (operation, options: any = {}) => ({
-    ...(options?.emit === false ? { emit: false } : {}),
-    source: "api",
-    reason: `plugin:${pluginId}:${operation}`,
-    sessionPath: textOrNull(runtimeScope?.sessionPath) || null,
-  });
+  const mutationOptions = (operation, options: any = {}) => {
+    const sessionId = textOrNull(runtimeScope?.sessionId) || null;
+    const sessionPath = textOrNull(runtimeScope?.sessionPath) || null;
+    const requestId = textOrNull(runtimeScope?.requestId) || null;
+    return {
+      ...(options?.emit === false ? { emit: false } : {}),
+      source: "plugin",
+      reason: `plugin:${pluginId}:${operation}`,
+      sessionId,
+      sessionPath,
+      requestId,
+      principal: {
+        kind: "plugin",
+        pluginId,
+        userId: textOrNull(runtimeScope?.userId) || null,
+        studioId: textOrNull(runtimeScope?.studioId) || null,
+        sessionId,
+        sessionPath,
+        connectionKind: textOrNull(runtimeScope?.connectionKind) || null,
+        credentialKind: textOrNull(runtimeScope?.credentialKind) || null,
+        requestId,
+      },
+    };
+  };
 
   return Object.freeze({
     async stat(ref) {

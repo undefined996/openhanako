@@ -19,9 +19,17 @@ import type {
   ResourceWriteExpectedVersionResult,
   ResourceMoveResult,
 } from "../types.ts";
+import type { ResourceAccessDecision } from "../resource-access-policy.ts";
+
+type GuardDecision = ResourceAccessDecision | {
+  allowed: boolean;
+  reason?: string;
+  code?: string;
+  safeMessage?: string;
+};
 
 type Guard = {
-  check: (absolutePath: string, operation: "read" | "write" | "delete") => { allowed: boolean; reason?: string };
+  check: (absolutePath: string, operation: "read" | "write" | "delete") => GuardDecision;
 };
 
 type LocalFsProviderOptions = {
@@ -344,7 +352,11 @@ export class LocalFsProvider {
   assertAllowed(filePath: string, operation: "read" | "write" | "delete"): void {
     if (!this.guard) return;
     const result = this.guard.check(filePath, operation);
-    if (!result?.allowed) throw resourceAccessDenied(operation, filePath, result?.reason);
+    if (result.allowed !== true) {
+      throw resourceAccessDenied(operation, filePath, result.code || result.reason, {
+        safeMessage: result.safeMessage,
+      });
+    }
   }
 }
 

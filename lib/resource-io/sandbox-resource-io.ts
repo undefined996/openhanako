@@ -21,6 +21,7 @@ type Options = {
   getExternalReadPaths?: () => string[];
   getSessionPath?: () => string | null;
   emitEvent?: (event: object, sessionPath?: string | null) => void;
+  eventBus?: ResourceEventBus;
   sessionFiles?: any;
   resolveSessionFile?: (fileId: string, options?: { sessionId?: string | null; sessionPath?: string | null }) => any;
   resourceService?: any;
@@ -40,6 +41,7 @@ export function createSandboxResourceIO({
   getExternalReadPaths,
   getSessionPath,
   emitEvent,
+  eventBus,
   sessionFiles,
   resolveSessionFile,
   resourceService,
@@ -82,7 +84,7 @@ export function createSandboxResourceIO({
 
   return new ResourceIO({
     providers,
-    eventBus: new ResourceEventBus({
+    eventBus: eventBus || new ResourceEventBus({
       emit: (event, sessionPath) => emitEvent?.(event, sessionPath),
     }),
     getSessionPath: () => getSessionPath?.() || null,

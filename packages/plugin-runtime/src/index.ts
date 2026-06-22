@@ -1,3 +1,25 @@
+import type {
+  PluginResourceDescriptor,
+  PluginResourceEdit,
+  PluginResourceListItem,
+  PluginResourceListResult,
+  PluginResourceMaterializeResult,
+  PluginResourceMoveResult,
+  PluginResourceReadResult,
+  PluginResourceRef,
+  PluginResourceSearchMatch,
+  PluginResourceSearchOptions,
+  PluginResourceSearchResult,
+  PluginResourceStat,
+  PluginResourceTrashOptions,
+  PluginResourceTrashResult,
+  PluginResourceVersion,
+  PluginResourceWatchTarget,
+  PluginResourceWriteConflictResult,
+  PluginResourceWriteExpectedVersionResult,
+  PluginResourceMutationResult,
+} from '@hana/plugin-protocol';
+
 export type MaybePromise<T> = T | Promise<T>;
 
 export type JsonSchema = Record<string, unknown>;
@@ -83,143 +105,25 @@ export interface HanaResourceEnvelope {
   [key: string]: unknown;
 }
 
-export type HanaResourceRef =
-  | { kind: 'local-file'; path: string }
-  | { kind: 'mount'; mountId: string; path: string }
-  | { kind: 'session-file'; fileId: string; sessionId?: string; sessionPath?: string }
-  | { kind: 'resource'; resourceId: string }
-  | { kind: 'url'; url: string };
-
-export interface HanaResourceVersion {
-  mtimeMs?: number;
-  size?: number | null;
-  sha256?: string;
-  etag?: string;
-  sequence?: number;
-}
-
-export type HanaResourceDescriptor = HanaResourceRef & {
-  provider?: string;
-  filePath?: string;
-  displayName?: string;
-};
-
-export interface HanaResourceStat {
-  resourceKey: string;
-  resource: HanaResourceDescriptor;
-  exists: boolean;
-  isDirectory: boolean;
-  version?: HanaResourceVersion;
-  filePath?: string;
-}
-
-export interface HanaResourceReadResult {
-  resourceKey: string;
-  resource: HanaResourceDescriptor;
-  content: Uint8Array;
-  version?: HanaResourceVersion;
-  filePath?: string;
-}
-
-export interface HanaResourceMutationResult {
-  changeType: 'created' | 'modified';
-  resourceKey: string;
-  resource: HanaResourceDescriptor;
-  version?: HanaResourceVersion;
-  filePath?: string;
-}
-
-export interface HanaResourceWriteConflictResult {
-  ok: false;
-  conflict: true;
-  resourceKey: string;
-  resource: HanaResourceDescriptor;
-  version?: HanaResourceVersion;
-  filePath?: string;
-}
-
-export type HanaResourceWriteExpectedVersionResult =
-  | HanaResourceMutationResult
-  | HanaResourceWriteConflictResult;
-
-export interface HanaResourceMoveResult {
-  oldResourceKey: string;
-  newResourceKey: string;
-  oldResource: HanaResourceDescriptor;
-  newResource: HanaResourceDescriptor;
-  oldFilePath?: string;
-  newFilePath?: string;
-}
-
-export interface HanaResourceTrashOptions {
-  namespace?: string;
-  metadata?: Record<string, unknown>;
-}
-
-export interface HanaResourceTrashResult {
-  resourceKey: string;
-  resource: HanaResourceDescriptor;
-  trashId: string;
-  trashPath?: string;
-  payloadPath?: string;
-  filePath?: string;
-}
-
-export interface HanaResourceEdit {
-  oldText: string;
-  newText: string;
-}
-
-export interface HanaResourceListItem {
-  name: string;
-  isDirectory: boolean;
-  size: number | null;
-  mtimeMs: number;
-}
-
-export interface HanaResourceListResult {
-  resourceKey: string;
-  resource: HanaResourceDescriptor;
-  items: HanaResourceListItem[];
-}
-
-export interface HanaResourceSearchOptions {
-  query?: string;
-  [key: string]: unknown;
-}
-
-export interface HanaResourceSearchMatch {
-  filePath: string;
-  line: number;
-  text: string;
-  name?: string;
-  relativePath?: string;
-  parentSubdir?: string;
-  isDirectory?: boolean;
-  size?: number | null;
-  mtimeMs?: number;
-}
-
-export interface HanaResourceSearchResult {
-  resourceKey: string;
-  resource: HanaResourceDescriptor;
-  matches: HanaResourceSearchMatch[];
-}
-
-export interface HanaResourceMaterializeResult {
-  resourceKey: string;
-  resource: HanaResourceDescriptor;
-  filePath: string;
-  version?: HanaResourceVersion;
-}
-
-export interface HanaResourceWatchTarget {
-  ref?: HanaResourceRef;
-  filePath: string;
-  isDirectory?: boolean;
-  resourceKey: string;
-  resource: HanaResourceDescriptor;
-}
+export type HanaResourceRef = PluginResourceRef;
+export type HanaResourceVersion = PluginResourceVersion;
+export type HanaResourceDescriptor = PluginResourceDescriptor;
+export type HanaResourceStat = PluginResourceStat;
+export type HanaResourceReadResult = PluginResourceReadResult;
+export type HanaResourceMutationResult = PluginResourceMutationResult;
+export type HanaResourceWriteConflictResult = PluginResourceWriteConflictResult;
+export type HanaResourceWriteExpectedVersionResult = PluginResourceWriteExpectedVersionResult;
+export type HanaResourceMoveResult = PluginResourceMoveResult;
+export type HanaResourceTrashOptions = PluginResourceTrashOptions;
+export type HanaResourceTrashResult = PluginResourceTrashResult;
+export type HanaResourceEdit = PluginResourceEdit;
+export type HanaResourceListItem = PluginResourceListItem;
+export type HanaResourceListResult = PluginResourceListResult;
+export type HanaResourceSearchOptions = PluginResourceSearchOptions;
+export type HanaResourceSearchMatch = PluginResourceSearchMatch;
+export type HanaResourceSearchResult = PluginResourceSearchResult;
+export type HanaResourceMaterializeResult = PluginResourceMaterializeResult;
+export type HanaResourceWatchTarget = PluginResourceWatchTarget;
 
 export interface HanaPluginResourceMutationOptions {
   emit?: boolean;

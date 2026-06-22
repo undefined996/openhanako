@@ -114,6 +114,11 @@ describe("createPluginContext", () => {
       capabilities: ["resource.read"],
       resourceIO,
       runtimeContext: {
+        userId: "user_1",
+        studioId: "studio_1",
+        connectionKind: "local",
+        credentialKind: "loopback_token",
+        sessionId: "sess_1",
         sessionPath: "/sessions/current.jsonl",
       },
     } as any);
@@ -137,6 +142,11 @@ describe("createPluginContext", () => {
       capabilities: ["resource.write"],
       resourceIO,
       runtimeContext: {
+        userId: "user_1",
+        studioId: "studio_1",
+        connectionKind: "local",
+        credentialKind: "loopback_token",
+        sessionId: "sess_1",
         sessionPath: "/sessions/current.jsonl",
       },
     } as any);
@@ -151,12 +161,36 @@ describe("createPluginContext", () => {
     expect(resourceIO.rename).toHaveBeenCalledWith(
       { kind: "local-file", path: "/workspace/old.md" },
       { kind: "local-file", path: "/workspace/new.md" },
-      expect.objectContaining({ reason: "plugin:resource-plugin:rename", sessionPath: "/sessions/current.jsonl" }),
+      expect.objectContaining({
+        source: "plugin",
+        reason: "plugin:resource-plugin:rename",
+        sessionId: "sess_1",
+        sessionPath: "/sessions/current.jsonl",
+        principal: expect.objectContaining({
+          kind: "plugin",
+          pluginId: "resource-plugin",
+          userId: "user_1",
+          studioId: "studio_1",
+          sessionId: "sess_1",
+          sessionPath: "/sessions/current.jsonl",
+          connectionKind: "local",
+          credentialKind: "loopback_token",
+        }),
+      }),
     );
     expect(resourceIO.trash).toHaveBeenCalledWith(
       { kind: "local-file", path: "/workspace/new.md" },
       { namespace: "plugin-test" },
-      expect.objectContaining({ reason: "plugin:resource-plugin:trash", sessionPath: "/sessions/current.jsonl" }),
+      expect.objectContaining({
+        source: "plugin",
+        reason: "plugin:resource-plugin:trash",
+        sessionId: "sess_1",
+        sessionPath: "/sessions/current.jsonl",
+        principal: expect.objectContaining({
+          kind: "plugin",
+          pluginId: "resource-plugin",
+        }),
+      }),
     );
   });
 

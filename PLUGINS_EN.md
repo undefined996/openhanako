@@ -562,6 +562,7 @@ hana.ui.resize({ height: 320 });
 await hana.toast.show({ message: 'Refreshed', type: 'success' });
 await hana.external.open('https://example.com');
 await hana.clipboard.writeText('Copied text');
+await hana.resources.open({ resource: { kind: 'session-file', fileId: 'sf_1' }, mode: 'preview' });
 ```
 
 The lower-level `hana.host.request(type, payload)` remains available for future or experimental capabilities. Prefer typed helpers for stable capabilities.
@@ -572,7 +573,7 @@ For compatibility, the host still accepts the legacy handshake:
 window.parent.postMessage({ type: 'ready' }, '*');
 ```
 
-The host accepts messages only from the current iframe window and matching origin. SDK requests go through the capability registry. Current built-in capabilities include `toast.show` (no grant required), `external.open` (grant required), and `clipboard.writeText` (grant required).
+The host accepts messages only from the current iframe window and matching origin. SDK requests go through the capability registry. Current built-in capabilities include `toast.show` (no grant required), `external.open` (grant required), `clipboard.writeText` (grant required), and resource request helpers `resource.open`, `resource.pick`, and `resource.requestAccess` (grant required).
 
 Grant-required iframe host capabilities must be declared in the manifest:
 
@@ -580,12 +581,14 @@ Grant-required iframe host capabilities must be declared in the manifest:
 {
   "manifestVersion": 1,
   "ui": {
-    "hostCapabilities": ["external.open", "clipboard.writeText"]
+    "hostCapabilities": ["external.open", "clipboard.writeText", "resource.open"]
   }
 }
 ```
 
 Sensitive capabilities that are not declared return `CAPABILITY_DENIED`. Unknown capability names are ignored at load time; `toast.show` does not need to be declared.
+
+`hana.resources.*` only sends host-mediated requests from the iframe: it can ask Hana to open a resource, pick resources, or request access, but it cannot read or write file contents directly. Actual user-resource reads and writes stay in server-side plugin routes, tools, or lifecycle code through `ctx.resources` and ResourceIO.
 
 The host appends `hana-theme` and `hana-css` query parameters to the iframe URL. Plugins can optionally reference the theme CSS for visual consistency:
 
