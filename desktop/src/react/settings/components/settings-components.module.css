@@ -124,6 +124,20 @@
     display: none;
 }
 
+/* List variant：保留卡片容器，行内去分隔线、加 hover、压缩行高 */
+.sectionList > .sectionBody > .row {
+    padding: 5px var(--space-12);
+    transition: background var(--duration-fast);
+}
+
+.sectionList > .sectionBody > .row:hover {
+    background: var(--overlay-light);
+}
+
+.sectionList > .sectionBody > .row + .row::before {
+    display: none;
+}
+
 /* Section 内的警告块（sandbox 关闭时显示等）
  * 位置：卡片内，row 之后，和 row 之间用贴边的伪元素分隔线 */
 .sectionWarning {
