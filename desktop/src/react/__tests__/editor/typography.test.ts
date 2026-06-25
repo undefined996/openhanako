@@ -28,6 +28,20 @@ function readMobileStyles(): string {
   );
 }
 
+function readScreenshotThemeStyles(): string[] {
+  return [
+    'solarized-light.css',
+    'solarized-light-desktop.css',
+    'solarized-dark.css',
+    'solarized-dark-desktop.css',
+    'sakura-light.css',
+    'sakura-light-desktop.css',
+  ].map((fileName) => fs.readFileSync(
+    path.join(process.cwd(), 'desktop/src/screenshot-themes', fileName),
+    'utf8',
+  ));
+}
+
 function readEditorTheme(): string {
   return fs.readFileSync(
     path.join(process.cwd(), 'desktop/src/react/editor/theme.ts'),
@@ -154,7 +168,7 @@ describe('editor typography settings', () => {
   it('uses the editor typography variables for markdown preview font size and weight', () => {
     const css = readPreviewStyles();
 
-    expect(css).toMatch(/:global\(\.preview-markdown\)\s*\{[\s\S]*padding:\s*var\(--space-lg\)\s+var\(--space-lg\)\s+var\(--space-md\)/);
+    expect(css).toMatch(/:global\(\.preview-markdown\)\s*\{[\s\S]*padding:\s*var\(--space-lg\)\s+var\(--editor-markdown-content-padding-x\)\s+var\(--space-md\)/);
     expect(css).toMatch(/:global\(\.preview-markdown\)\s*\{[\s\S]*font-size:\s*var\(--editor-markdown-font-size\)/);
     expect(css).toMatch(/:global\(\.preview-markdown\)\s*\{[\s\S]*font-family:\s*var\(--editor-markdown-font-family,\s*var\(--font-serif\)\)/);
     expect(css).toMatch(/:global\(\.preview-markdown\)\s*\{[\s\S]*font-weight:\s*400/);
@@ -207,9 +221,17 @@ describe('editor typography settings', () => {
     }
 
     const previewCss = readPreviewStyles();
+    expect(previewCss).toMatch(/:global\(\.preview-markdown > \*\)\s*\{[\s\S]*max-width:\s*var\(--editor-markdown-content-width\)[\s\S]*margin-left:\s*auto[\s\S]*margin-right:\s*auto/);
+    expect(previewCss).toMatch(/:global\(\.preview-markdown > \.markdown-table-scroll\)\s*\{[\s\S]*width:\s*100%[\s\S]*max-width:\s*var\(--editor-markdown-content-width\)[\s\S]*margin-left:\s*auto[\s\S]*margin-right:\s*auto/);
     expect(previewCss).toMatch(/:global\(\.cm-table-widget\)\s*\{[\s\S]*max-width:\s*100%[\s\S]*overflow-x:\s*auto/);
     expect(previewCss).toMatch(/:global\(\.cm-table-widget table\)\s*\{[\s\S]*width:\s*100%[\s\S]*min-width:\s*max-content/);
     expect(previewCss).toMatch(/:global\(\.cm-table-widget th\),\s*:global\(\.cm-table-widget td\)\s*\{[\s\S]*white-space:\s*nowrap/);
+
+    for (const css of readScreenshotThemeStyles()) {
+      expect(css).toMatch(/\.markdown-table-scroll\s*\{[\s\S]*max-width:\s*100%[\s\S]*overflow-x:\s*auto/);
+      expect(css).toMatch(/\.markdown-table-scroll > table\s*\{[\s\S]*min-width:\s*max-content[\s\S]*margin:\s*0/);
+      expect(css).toMatch(/th,\s*td\s*\{[\s\S]*white-space:\s*nowrap/);
+    }
   });
 
   it('uses the same typography variables in markdown editor and preview rendering', () => {

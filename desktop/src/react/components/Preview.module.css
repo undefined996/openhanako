@@ -103,14 +103,28 @@
 .previewPanelBody :global(.preview-markdown) {
     box-sizing: border-box;
     width: 100%;
-    max-width: var(--editor-markdown-content-width);
-    margin-left: auto;
-    margin-right: auto;
-    padding: var(--space-lg) var(--space-lg) var(--space-md);
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+    padding: var(--space-lg) var(--editor-markdown-content-padding-x) var(--space-md);
     font-size: var(--editor-markdown-font-size);
     font-weight: 400;
     line-height: var(--editor-markdown-line-height);
     font-family: var(--editor-markdown-font-family, var(--font-serif));
+}
+
+.previewPanelBody :global(.preview-markdown > *) {
+    box-sizing: border-box;
+    max-width: var(--editor-markdown-content-width);
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.previewPanelBody :global(.preview-markdown > .markdown-table-scroll) {
+    width: 100%;
+    max-width: var(--editor-markdown-content-width);
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .previewPanelBody :global(.markdown-cover-drop-host .preview-markdown) {
