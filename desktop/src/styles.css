@@ -2480,6 +2480,61 @@ body.resizing .channel-inspector-rail {
     background: var(--overlay-light);
 }
 
+.context-menu-shortcut {
+    color: var(--text-faint, rgba(0, 0, 0, 0.35));
+    font-size: 0.65rem;
+    margin-left: var(--space-lg);
+    font-family: inherit;
+}
+
+.context-menu-fmt-row {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: var(--space-xs) 6px;
+}
+
+.context-menu-fmt-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm, 4px);
+    cursor: default;
+    transition: background var(--duration-instant);
+    color: var(--text-muted);
+}
+
+.context-menu-fmt-btn:hover {
+    background: var(--overlay-subtle);
+    color: var(--text);
+}
+
+.context-menu-fmt-btn svg {
+    width: 15px;
+    height: 15px;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.context-menu-fmt-text {
+    font-size: var(--fs-hint);
+    font-weight: 500;
+    line-height: 1;
+    font-family: inherit;
+}
+
+.context-menu-fmt-sep {
+    width: 1px;
+    height: var(--space-md);
+    background: var(--overlay-light);
+    margin: 0 2px;
+}
+
 /* (笺编辑器样式已迁移至 Desk.module.css) */
 
 /* Toast 通知 */

@@ -192,6 +192,7 @@ describe('PreviewEditor file sync', () => {
 
     act(() => {
       view?.dispatch({ selection: { anchor: 0, head: 5 } });
+      view?.focus();
     });
 
     fireEvent.mouseUp(window);
